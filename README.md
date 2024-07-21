@@ -25,8 +25,8 @@
 1. **Baixe o Script**: Baixe o script `Jornada365_WindowsTools.ps1` do repositório.
 2. **Execute o Script**: Abra o PowerShell como administrador e execute o script:
    ```powershell
-   Set-ExecutionPolicy Unrestricted -Scope Process
-   .\Jornada365_WindowsTools.ps1
+   cd ~\Downloads
+   powershell -ExecutionPolicy Bypass -File .\j365_WinTools.ps1
    ```
 3. **Selecione as Tarefas**: Use a interface gráfica para selecionar as tarefas que deseja executar.
 4. **Execute**: Clique no botão "Executar Selecionados" para iniciar as tarefas escolhidas.
