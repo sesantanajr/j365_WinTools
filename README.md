@@ -18,6 +18,8 @@
 - **Modo de Alto Desempenho**: Configura o plano de energia para maximizar o desempenho.
 - **Instalação de Dependências**: Instala e atualiza automaticamente todas as dependências necessárias, como o Microsoft Visual C++.
 
+- ![Jornada 365 Windows Tools](https://github.com/sesantanajr/j365_WinTools/blob/main/jornada365%20-%20windowns%20tools.png)
+
 ## Instruções de Uso
 
 1. **Baixe o Script**: Baixe o script `Jornada365_WindowsTools.ps1` do repositório.
