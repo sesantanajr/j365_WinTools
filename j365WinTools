@@ -55,6 +55,7 @@ $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
 $form.MaximizeBox = $false
 $form.MinimizeBox = $true
 $form.ShowInTaskbar = $true
+$form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
 
 # Add logo
 $logo = New-Object System.Windows.Forms.PictureBox
@@ -96,7 +97,7 @@ $categories = @{
     "Microsoft" = @("Microsoft 365", "Microsoft Teams Trabalho", "Microsoft Teams Pessoal", "PowerShell 7", "Microsoft Graph", "OneDrive", "NetFramework", "Microsoft Visual C++")
     "Navegadores" = @("Arc", "Firefox", "Chrome", "Opera GX", "Opera One", "Edge", "Vivaldi", "Brave")
     "Utilitarios" = @("7zip", "AnyDesk", "TeamViewer", "Remote Desktop Manager", "FortiClient VPN", "ScreenShot HD", "Lightshot", "Telegram", "Discord", "WhatsApp Web")
-    "Sistema" = @("Hyper-V", "Windows SandBox", "Winget", "Atualizar todas as aplicacoes", "Atualizar Windows e Drivers", "Limpeza completa de disco", "Manutencao do Windows", "Modo Alto Desempenho", "Otimizar Windows")
+    "Sistema" = @("Hyper-V", "Windows SandBox", "Winget", "Atualizar todas as aplicacoes", "Atualizar Windows e Drivers", "Limpeza completa de disco", "Manutencao do Windows", "Modo Alto Desempenho", "Otimizar Windows", "Chocolatey")
 }
 
 # Function to create and align category labels and checkboxes
@@ -182,133 +183,83 @@ function Ensure-ServiceRunning {
     param (
         [string]$serviceName
     )
-    Write-Output "Verificando status do serviço: $serviceName"
+    Write-Output "Verificando status do servico: $serviceName"
     $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($service.Status -ne 'Running') {
-        Write-Output "Iniciando serviço: $serviceName"
+        Write-Output "Iniciando servico: $serviceName"
         Start-Service -Name $serviceName
         Write-Output "$serviceName iniciado."
     } else {
-        Write-Output "$serviceName já está em execução."
+        Write-Output "$serviceName ja esta em execucao."
     }
 }
 
-# Function to check if Winget is installed
-function Check-InstallWinget {
-    Write-Output "Verificando se Winget está instalado..."
+# Function to stop a service
+function Stop-ServiceIfRunning {
+    param (
+        [string]$serviceName
+    )
+    Write-Output "Verificando status do servico: $serviceName"
+    $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+    if ($service.Status -eq 'Running') {
+        Write-Output "Parando servico: $serviceName"
+        Stop-Service -Name $serviceName -Force
+        Write-Output "$serviceName parado."
+    } else {
+        Write-Output "$serviceName ja esta parado."
+    }
+}
+
+# Function to check if Winget is installed and install if necessary
+function Ensure-WingetInstalled {
+    Write-Output "Verificando se Winget esta instalado..."
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Write-Output "Winget não encontrado, instalando..."
+        Write-Output "Winget nao encontrado, instalando..."
         Invoke-WebRequest -Uri "https://aka.ms/getwinget" -OutFile "$env:temp\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
         Add-AppxPackage -Path "$env:temp\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
     } else {
-        Write-Output "Winget já está instalado."
+        Write-Output "Winget ja esta instalado."
     }
 }
 
-# Function to install a browser
-function Install-Browser {
-    param ($browser)
-    Write-Output "Verificando instalação do navegador: $browser"
-    if (Get-Command $browser -ErrorAction SilentlyContinue) {
-        Write-Output "Navegador $browser encontrado. Atualizando..."
-        Update-Browser -browser $browser
+# Function to install or update applications using winget
+function InstallOrUpdate-Application {
+    param (
+        [string]$appId
+    )
+    Write-Output "Verificando instalacao ou atualizacao do aplicativo: $appId"
+    $installedApp = winget list | Where-Object { $_ -match $appId }
+    if ($installedApp) {
+        Write-Output "Aplicativo $appId encontrado. Atualizando..."
+        Start-Process "winget" -ArgumentList "upgrade --id $appId --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
     } else {
-        Write-Output "Instalando navegador: $browser"
-        Start-Process "winget" -ArgumentList "install --id $browser --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
-    }
-}
-
-# Function to update a browser
-function Update-Browser {
-    param ($browser)
-    Write-Output "Verificando se o navegador $browser está em execução"
-    $process = Get-Process -Name $browser -ErrorAction SilentlyContinue
-    if ($process) {
-        $result = [System.Windows.Forms.MessageBox]::Show("O navegador $browser está em execução. Feche para continuar com a atualização.", "Atualização de Navegador", [System.Windows.Forms.MessageBoxButtons]::YesNo)
-        if ($result -eq [System.Windows.Forms.DialogResult]::Yes) {
-            Write-Output "Parando processo $browser"
-            Stop-Process -Name $browser -Force
-            Write-Output "Atualizando navegador: $browser"
-            Start-Process "winget" -ArgumentList "upgrade --id $browser --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
-        } else {
-            Write-Output "Pulando atualização para $browser."
-        }
-    } else {
-        Write-Output "Atualizando navegador: $browser"
-        Start-Process "winget" -ArgumentList "upgrade --id $browser --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
-    }
-}
-
-# Function to install applications
-function Install-Application {
-    param ($app)
-    Write-Output "Verificando instalação do aplicativo: $app"
-    if (Get-Command $app -ErrorAction SilentlyContinue) {
-        Write-Output "Aplicativo $app encontrado. Atualizando..."
-        Update-Application -app $app
-    } else {
-        Write-Output "Instalando aplicativo: $app"
-        Start-Process "winget" -ArgumentList "install --id $app --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
-    }
-}
-
-# Function to update an application
-function Update-Application {
-    param ($app)
-    Write-Output "Verificando se o aplicativo $app está em execução"
-    $process = Get-Process -Name $app -ErrorAction SilentlyContinue
-    if ($process) {
-        $result = [System.Windows.Forms.MessageBox]::Show("O aplicativo $app está em execução. Feche para continuar com a atualização.", "Atualização de Aplicativo", [System.Windows.Forms.MessageBoxButtons]::YesNo)
-        if ($result -eq [System.Windows.Forms.DialogResult]::Yes) {
-            Write-Output "Parando processo $app"
-            Stop-Process -Name $app -Force
-            Write-Output "Atualizando aplicativo: $app"
-            Start-Process "winget" -ArgumentList "upgrade --id $app --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
-        } else {
-            Write-Output "Pulando atualização para $app."
-        }
-    } else {
-        Write-Output "Atualizando aplicativo: $app"
-        Start-Process "winget" -ArgumentList "upgrade --id $app --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
-    }
-}
-
-# Function to install or update OneDrive
-function Install-Update-OneDrive {
-    Write-Output "Verificando instalação do OneDrive"
-    if (Get-Command OneDrive -ErrorAction SilentlyContinue) {
-        Write-Output "OneDrive encontrado. Atualizando..."
-        Start-Process "winget" -ArgumentList "upgrade --id Microsoft.OneDrive --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
-    } else {
-        Write-Output "Instalando OneDrive..."
-        Start-Process "winget" -ArgumentList "install --id Microsoft.OneDrive --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
+        Write-Output "Instalando aplicativo: $appId"
+        Start-Process "winget" -ArgumentList "install --id $appId --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
     }
 }
 
 # Function to install dependencies
 function Install-Dependencies {
-    Write-Output "Instalando dependências padrão..."
+    Write-Output "Instalando dependencias padrao..."
     $dependencies = @(
         "Microsoft.VCRedist.2015+.x64"
     )
     foreach ($dependency in $dependencies) {
-        Write-Output "Instalando dependência: $dependency"
-        Start-Process "winget" -ArgumentList "install --id $dependency --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
-        Start-Process "winget" -ArgumentList "upgrade --id $dependency --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
+        Write-Output "Instalando dependencia: $dependency"
+        Start-Process "winget" -ArgumentList "install --id $dependency --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
     }
 }
 
-# Function to update all applications
+# Function to update all applications using winget
 function Update-AllApplications {
-    Write-Output "Atualizando todas as aplicações..."
-
-    # Remover msstore como fonte, se existir
-    if (Get-PackageSource -Name "msstore" -ErrorAction SilentlyContinue) {
-        Unregister-PackageSource -Name "msstore" -ProviderName "NuGet" -Force
+    Write-Output "Atualizando todas as aplicacoes..."
+    try {
+        Start-Process "winget" -ArgumentList "source update" -NoNewWindow -Wait
+        Start-Process "winget" -ArgumentList "upgrade winget" -NoNewWindow -Wait
+        Start-Process "winget" -ArgumentList "upgrade --all --silent --accept-package-agreements --accept-source-agreements --force --include-unknown" -NoNewWindow -Wait
+    } catch {
+        Write-Output "Erro ao atualizar todas as aplicacoes: $_"
     }
-
-    # Atualizar todas as aplicações usando winget
-    Start-Process "winget" -ArgumentList "upgrade --all --silent --accept-package-agreements --accept-source-agreements --include-unknown" -NoNewWindow -Wait
 }
 
 # Function to update Windows and drivers, including optional updates and fixing common problems
@@ -323,7 +274,7 @@ function Update-WindowsAndDrivers {
     try {
         Install-WindowsUpdate -AcceptAll -AutoReboot -IncludeOptional
     } catch {
-        Write-Output "Erro durante a atualização do Windows: $_"
+        Write-Output "Erro durante a atualizacao do Windows: $_"
     }
 
     # Fix common Windows Update issues
@@ -334,24 +285,24 @@ function Update-WindowsAndDrivers {
         "net stop msiserver",
         {
             try {
-                Stop-Service -Name wuauserv -Force
+                Stop-ServiceIfRunning -serviceName "wuauserv"
                 $destPath1 = "C:\Windows\SoftwareDistribution"
                 if (Test-Path -Path $destPath1) {
                     Remove-Item -Path $destPath1 -Recurse -Force
                 }
-                Start-Service -Name wuauserv
+                Ensure-ServiceRunning -serviceName "wuauserv"
             } catch {
                 Write-Output "Erro ao mover SoftwareDistribution: $($_.Exception.Message)"
             }
         },
         {
             try {
-                Stop-Service -Name cryptSvc -Force
+                Stop-ServiceIfRunning -serviceName "cryptSvc"
                 $destPath2 = "C:\Windows\System32\catroot2"
                 if (Test-Path -Path $destPath2) {
                     Remove-Item -Path $destPath2 -Recurse -Force
                 }
-                Start-Service -Name cryptSvc
+                Ensure-ServiceRunning -serviceName "cryptSvc"
             } catch {
                 Write-Output "Erro ao mover catroot2: $($_.Exception.Message)"
             }
@@ -384,7 +335,7 @@ function Complete-DiskCleanup {
 
 # Function to clean temporary files and cache
 function Clean-TemporaryFiles {
-    Write-Output "Limpando arquivos temporários e cache..."
+    Write-Output "Limpando arquivos temporarios e cache..."
     $tempPaths = @(
         "$env:LOCALAPPDATA\Temp\*",
         "$env:windir\Temp\*",
@@ -393,23 +344,27 @@ function Clean-TemporaryFiles {
         "$env:USERPROFILE\AppData\Local\Microsoft\Windows\INetCookies\*"
     )
     foreach ($path in $tempPaths) {
-        if ($path -notlike "*Downloads*" -and $path -notlike "*$env:USERPROFILE\*") {
-            try {
-                Write-Output "Limpando: $path"
-                Remove-Item -Path $path -Recurse -Force -ErrorAction Stop
-            } catch {
-                Write-Output "Erro ao limpar ${path}: $($_.Exception.Message)"
-            }
+        try {
+            Write-Output "Limpando: $path"
+            Remove-Item -Path $path -Recurse -Force -ErrorAction Stop
+        } catch {
+            Write-Output "Erro ao limpar ${path}: $($_.Exception.Message)"
         }
     }
-    Write-Output "Limpeza de arquivos temporários e cache concluída."
+    Write-Output "Limpeza de arquivos temporarios e cache concluida."
 }
 
 # Function to activate Hyper-V
 function Activate-HyperV {
-    Write-Output "Ativando Hyper-V..."
-    Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRestart
-    Write-Output "Hyper-V ativado."
+    Write-Output "Verificando se o Hyper-V pode ser ativado..."
+    $windowsEdition = (Get-WmiObject -Class Win32_OperatingSystem).Caption
+    if ($windowsEdition -match "Windows 10 Home") {
+        Write-Output "Hyper-V nao e suportado no Windows 10 Home."
+    } else {
+        Write-Output "Ativando Hyper-V..."
+        Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRestart
+        Write-Output "Hyper-V ativado."
+    }
 }
 
 # Function to install Windows Sandbox
@@ -419,51 +374,17 @@ function Install-WindowsSandbox {
     Write-Output "Windows Sandbox instalado."
 }
 
-# Function to set high performance power plan and modify registry settings
-function Set-HighPerformancePowerPlan {
-    Write-Output "Configurando modo de alto desempenho..."
-    
-    # Add registry keys
-    Write-Output "Adicionando chaves de registro..."
+# Function to apply high performance power plan settings
+function Apply-HighPerformanceSettings {
+    Write-Output "Aplicando configuracoes de alto desempenho..."
     REG ADD HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer /v NoClose /t REG_DWORD /d 0 /f
     REG ADD HKLM\SYSTEM\CurrentControlSet\Control\Power /v CsEnabled /t REG_DWORD /d 0 /f
-    
-    $powerPlanName = "J365 - Desempenho Máximo"
-    $highPerfGuid = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c"
-
-    # Check if the plan already exists
-    $existingPlan = powercfg /list | Select-String -Pattern $powerPlanName
-    if ($existingPlan) {
-        Write-Output "Plano de energia $powerPlanName já existe. Atualizando..."
-        $guid = ($existingPlan | Select-Object -First 1 -ExpandProperty Line).Split()[3]
-    } else {
-        Write-Output "Criando novo plano de energia: $powerPlanName"
-        $guid = (powercfg /duplicatescheme $highPerfGuid).Trim()
-        powercfg /changename $guid $powerPlanName
-    }
-
-    # Configure power settings
-    $settings = @(
-        @{SubGroup="SUB_PROCESSOR"; Setting="PROCTHROTTLEMAX"; ValueDC=100; ValueAC=100},
-        @{SubGroup="SUB_PROCESSOR"; Setting="IDLEDISABLE"; ValueDC=1; ValueAC=1},
-        @{SubGroup="SUB_DISK"; Setting="DISKIDLE"; ValueDC=0; ValueAC=0},
-        @{SubGroup="SUB_SLEEP"; Setting="STANDBYIDLE"; ValueDC=0; ValueAC=0}
-    )
-
-    foreach ($setting in $settings) {
-        powercfg /setdcvalueindex $guid $setting.SubGroup $setting.Setting $setting.ValueDC
-        powercfg /setacvalueindex $guid $setting.SubGroup $setting.Setting $setting.ValueAC
-    }
-
-    # Apply the power plan
-    powercfg /setactive $guid
-    Write-Output "Modo de alto desempenho configurado."
-    Write-Output "Reinicie o sistema para que as alterações tenham efeito."
+    Write-Output "Configuracoes de alto desempenho aplicadas. Reinicie o computador para concluir a configuracao."
 }
 
 # Function to perform system maintenance
 function Perform-WindowsMaintenance {
-    Write-Output "Executando manutenção do Windows..."
+    Write-Output "Executando manutencao do Windows..."
     $timestamp = Get-Date -Format "dd_MM_yyyy_HH_mm"
     $maintenanceLog = "C:\Relatorio\J365_WIN_Maintenance_${timestamp}.txt"
 
@@ -471,15 +392,13 @@ function Perform-WindowsMaintenance {
         Start-Process "sfc" -ArgumentList "/scannow" -NoNewWindow -Wait
         Start-Process "DISM" -ArgumentList "/Online /Cleanup-Image /RestoreHealth" -NoNewWindow -Wait
         Start-Process "DISM" -ArgumentList "/Online /Cleanup-Image /StartComponentCleanup" -NoNewWindow -Wait
-        Write-Output "Manutenção do Windows concluída."
-        Write-Output "Executando chkdsk..."
-        chkdsk /f | Out-File -FilePath $maintenanceLog -Append
-        Write-Output "Atualizando políticas de grupo..."
+        Write-Output "Manutencao do Windows concluida."
+        Write-Output "Atualizando politicas de grupo..."
         gpupdate /force | Out-File -FilePath $maintenanceLog -Append
         Write-Output "Limpando DNS..."
         ipconfig /flushdns | Out-File -FilePath $maintenanceLog -Append
     } else {
-        Write-Output "Manutenção do Windows já realizada recentemente. Pulando etapa."
+        Write-Output "Manutencao do Windows ja realizada recentemente. Pulando etapa."
     }
 }
 
@@ -489,8 +408,12 @@ function Optimize-Windows {
     
     # Disable unnecessary startup programs
     Get-CimInstance Win32_StartupCommand | ForEach-Object {
-        Write-Output "Desativando programa de inicialização: $($_.Name)"
-        $_.Delete()
+        Write-Output "Desativando programa de inicializacao: $($_.Name)"
+        try {
+            $_ | Remove-CimInstance -ErrorAction Stop
+        } catch {
+            Write-Output "Erro ao desativar o programa de inicializacao: $($_.Exception.Message)"
+        }
     }
 
     # Set visual effects for best performance
@@ -503,48 +426,54 @@ function Optimize-Windows {
         try {
             Set-Service -Name $service -StartupType Disabled
             Stop-Service -Name $service -Force
-            Write-Output "Serviço ${service} desativado."
+            Write-Output "Servico ${service} desativado."
         } catch {
-            Write-Output "Erro ao desativar o serviço ${service}: $_"
+            Write-Output "Erro ao desativar o servico ${service}: $_"
         }
     }
 
-    Write-Output "Otimização do Windows concluída."
+    Write-Output "Otimizacao do Windows concluida."
 }
 
-# Function to handle OBS Studio specific issues
-function Handle-OBS-Studio {
-    Write-Output "Tratando questões específicas do OBS Studio..."
-    # Ensure OBS is not running before installation
-    $obsProcess = Get-Process -Name "obs64" -ErrorAction SilentlyContinue
-    if ($obsProcess) {
-        Write-Output "OBS Studio está em execução. Parando o processo para continuar..."
-        Stop-Process -Name "obs64" -Force
+# Function to install or update Chocolatey
+function Ensure-ChocolateyInstalled {
+    Write-Output "Verificando se Chocolatey esta instalado..."
+    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+        Write-Output "Chocolatey nao encontrado, instalando..."
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+        Write-Output "Chocolatey instalado."
+    } else {
+        Write-Output "Chocolatey ja esta instalado. Atualizando..."
+        choco upgrade chocolatey -y --force
     }
-    Install-Application "OBSProject.OBSStudio"
 }
 
-# Function to handle Wondershare Filmora specific issues
-function Handle-Wondershare-Filmora {
-    Write-Output "Tratando questões específicas do Wondershare Filmora..."
-    # Ensure Filmora is not running before installation
-    $filmoraProcess = Get-Process -Name "Wondershare Filmora" -ErrorAction SilentlyContinue
-    if ($filmoraProcess) {
-        Write-Output "Wondershare Filmora está em execução. Parando o processo para continuar..."
-        Stop-Process -Name "Wondershare Filmora" -Force
+# Function to install or update applications using Chocolatey
+function InstallOrUpdate-ApplicationChoco {
+    param (
+        [string]$appId
+    )
+    Write-Output "Verificando instalacao ou atualizacao do aplicativo: $appId"
+    $installedApp = choco list --local-only | Where-Object { $_ -match $appId }
+    if ($installedApp) {
+        Write-Output "Aplicativo $appId encontrado. Atualizando..."
+        choco upgrade $appId -y --force
+    } else {
+        Write-Output "Instalando aplicativo: $appId"
+        choco install $appId -y --force
     }
-    Install-Application "Wondershare.Filmora"
 }
 
-# Function to install Teams (Work and Personal)
-function Install-Update-Teams {
-    Write-Output "Verificando e instalando/atualizando Microsoft Teams (Work)..."
-    Start-Process "winget" -ArgumentList "install --id Microsoft.Teams --silent --accept-package-agreements --accept-source-agreements" -NoNewWindow -Wait
-    Start-Process "winget" -ArgumentList "upgrade --id Microsoft.Teams --silent --accept-package-agreements --accept-source-agreements" -NoNewWindow -Wait
-
-    Write-Output "Verificando e instalando/atualizando Microsoft Teams (Personal)..."
-    Start-Process "winget" -ArgumentList "install --id Microsoft.Teams.Free --silent --accept-package-agreements --accept-source-agreements" -NoNewWindow -Wait
-    Start-Process "winget" -ArgumentList "upgrade --id Microsoft.Teams.Free --silent --accept-package-agreements --accept-source-agreements" -NoNewWindow -Wait
+# Function to update all applications using Chocolatey
+function Update-AllApplicationsChoco {
+    Write-Output "Atualizando todas as aplicacoes com Chocolatey..."
+    try {
+        choco upgrade all -y --force
+    } catch {
+        Write-Output "Erro ao atualizar todas as aplicacoes com Chocolatey: $_"
+    }
 }
 
 # Function to execute tasks based on selected checkboxes
@@ -566,43 +495,45 @@ function Execute-Tasks {
 
             try {
                 switch ($checkbox.Text) {
-                    "Microsoft 365" { Install-Application "Microsoft.Office" }
+                    "Microsoft 365" { InstallOrUpdate-Application "Microsoft.Office" }
                     "Microsoft Teams Trabalho" { Install-Update-Teams }
                     "Microsoft Teams Pessoal" { Install-Update-Teams }
-                    "PowerShell 7" { Install-Application "Microsoft.PowerShell" }
-                    "Microsoft Graph" { Install-Application "Microsoft.Graph" }
+                    "PowerShell 7" { InstallOrUpdate-Application "Microsoft.PowerShell" }
+                    "Microsoft Graph" { InstallOrUpdate-Application "Microsoft.Graph" }
                     "OneDrive" { Install-Update-OneDrive }
-                    "NetFramework" { Install-Application "Microsoft.NetFramework" }
+                    "NetFramework" { InstallOrUpdate-Application "Microsoft.NetFramework" }
                     "Microsoft Visual C++" { Install-Dependencies }
-                    "Arc" { Install-Browser "Arc.Browser" }
-                    "Firefox" { Install-Browser "Mozilla.Firefox" }
-                    "Chrome" { Install-Browser "Google.Chrome" }
-                    "Opera GX" { Install-Browser "Opera.GX" }
-                    "Opera One" { Install-Browser "Opera.One" }
-                    "Edge" { Install-Browser "Microsoft.Edge" }
-                    "Vivaldi" { Install-Browser "Vivaldi.Browser" }
-                    "Brave" { Install-Browser "Brave.Browser" }
-                    "7zip" { Install-Application "7zip.7zip" }
-                    "AnyDesk" { Install-Application "AnyDesk.SoftwareGmbH" }
-                    "TeamViewer" { Install-Application "TeamViewer.TeamViewer" }
-                    "Remote Desktop Manager" { Install-Application "Devolutions.RemoteDesktopManager" }
-                    "FortiClient VPN" { Install-Application "Fortinet.FortiClientVPN" }
-                    "ScreenShot HD" { Install-Application "Screenpresso.Screenpresso" }
-                    "Lightshot" { Install-Application "Skillbrains.Lightshot" }
-                    "Telegram" { Install-Application "Telegram.TelegramDesktop" }
-                    "Discord" { Install-Application "Discord.Discord" }
-                    "WhatsApp Web" { Install-Application "WhatsApp.WhatsAppDesktop" }
+                    "Arc" { InstallOrUpdate-Application "Arc.Browser" }
+                    "Firefox" { InstallOrUpdate-Application "Mozilla.Firefox" }
+                    "Chrome" { InstallOrUpdate-Application "Google.Chrome" }
+                    "Opera GX" { InstallOrUpdate-Application "Opera.GX" }
+                    "Opera One" { InstallOrUpdate-Application "Opera.One" }
+                    "Edge" { InstallOrUpdate-Application "Microsoft.Edge" }
+                    "Vivaldi" { InstallOrUpdate-Application "Vivaldi.Browser" }
+                    "Brave" { InstallOrUpdate-Application "Brave.Browser" }
+                    "7zip" { InstallOrUpdate-Application "7zip.7zip" }
+                    "AnyDesk" { InstallOrUpdate-Application "AnyDesk.SoftwareGmbH" }
+                    "TeamViewer" { InstallOrUpdate-Application "TeamViewer.TeamViewer" }
+                    "Remote Desktop Manager" { InstallOrUpdate-Application "Devolutions.RemoteDesktopManager" }
+                    "FortiClient VPN" { InstallOrUpdate-Application "Fortinet.FortiClientVPN" }
+                    "ScreenShot HD" { InstallOrUpdate-Application "Screenpresso.Screenpresso" }
+                    "Lightshot" { InstallOrUpdate-Application "Skillbrains.Lightshot" }
+                    "Telegram" { InstallOrUpdate-Application "Telegram.TelegramDesktop" }
+                    "Discord" { InstallOrUpdate-Application "Discord.Discord" }
+                    "WhatsApp Web" { InstallOrUpdate-Application "WhatsApp.WhatsAppDesktop" }
                     "Hyper-V" { Activate-HyperV }
                     "Windows SandBox" { Install-WindowsSandbox }
-                    "Winget" { Check-InstallWinget }
-                    "Atualizar todas as aplicacoes" { Update-AllApplications }
+                    "Winget" { Ensure-WingetInstalled }
+                    "Atualizar todas as aplicacoes" { 
+                        Update-AllApplications 
+                        Update-AllApplicationsChoco 
+                    }
                     "Atualizar Windows e Drivers" { Update-WindowsAndDrivers }
                     "Limpeza completa de disco" { Complete-DiskCleanup }
                     "Manutencao do Windows" { Perform-WindowsMaintenance }
-                    "Modo Alto Desempenho" { Set-HighPerformancePowerPlan }
+                    "Modo Alto Desempenho" { Apply-HighPerformanceSettings }
                     "Otimizar Windows" { Optimize-Windows }
-                    "OBS Studio" { Handle-OBS-Studio }
-                    "Wondershare Filmora" { Handle-Wondershare-Filmora }
+                    "Chocolatey" { Ensure-ChocolateyInstalled }
                 }
             } catch {
                 Write-Output "Erro ao executar $($checkbox.Text): $_" | Out-File -FilePath $logFile -Append
@@ -613,7 +544,8 @@ function Execute-Tasks {
         }
     }
 
-    $progressLabel.Text = "Concluído"
+    $progressLabel.Text = "Concluido"
+    Write-Output "Modo Alto Desempenho configurado. Reinicie o sistema para aplicar as configuracoes. Depois disso, mude para o plano de energia que preferir."
 }
 
 # Add progress bar and label
@@ -649,20 +581,16 @@ try {
         Register-PackageSource -Name "PSGallery" -Location "https://www.powershellgallery.com/api/v2" -ProviderName "NuGet" -Trusted
     }
 
-    # Update Packages
-    if (Get-Module -ListAvailable -Name Microsoft.PowerShell.Security) {
-        Update-Module -Name Microsoft.PowerShell.Security -Force
-    }
-    if (Get-Module -ListAvailable -Name PowerShellGet) {
-        Update-Module -Name PowerShellGet -Force
-    }
+    # Remove Update-Module commands
+    # Removed Update-Module -Name Microsoft.PowerShell.Security -Force
+    # Removed Update-Module -Name PowerShellGet -Force
 
     # Test Connectivity to Microsoft Store API
     $response = Invoke-WebRequest -Uri "https://store.microsoft.com/api/v2" -UseBasicParsing
     if ($response.StatusCode -eq 200) {
-        Write-Output "Conexão com a API da Microsoft Store bem-sucedida."
+        Write-Output "Conexao com a API da Microsoft Store bem-sucedida."
     } else {
-        Write-Error "Falha ao conectar à API da Microsoft Store."
+        Write-Error "Falha ao conectar a API da Microsoft Store."
     }
 
     # Check and Restart BITS Service
@@ -671,7 +599,7 @@ try {
         Restart-Service -Name BITS -Force
     }
 
-    Write-Output "Todas as operações foram concluídas com sucesso."
+    Write-Output "Todas as operacoes foram concluidas com sucesso."
 
 } catch {
     Write-Error "Ocorreu um erro: $_"
