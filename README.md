@@ -81,7 +81,6 @@
 - **Código de Saída 6 do Winget**: O script fecha automaticamente todos os processos relacionados antes de iniciar a instalação ou atualização.
 - **Comando DISM**: O comando `dism` é executado com um tempo limite para evitar travamentos.
 - **Instalação de Dependências**: Todas as dependências necessárias são instaladas e atualizadas automaticamente.
-- 
 ---
 
 **Jornada 365 - Windows Tools** é desenvolvido e mantido por [Sérgio Sant'Ana Júnior](https://jornada365.cloud).
