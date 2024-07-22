@@ -66,31 +66,50 @@ function Stop-Logging {
 # Create the main form
 $form = New-UIElement -type "Form" -properties @{
     Text = "Jornada 365 - Windows Tools"
-    Size = New-Object System.Drawing.Size(1020, 800)
+    Size = New-Object System.Drawing.Size(950, 750)
     StartPosition = "CenterScreen"
     BackColor = [System.Drawing.Color]::White
-    FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
     MaximizeBox = $false
     MinimizeBox = $true
     ShowInTaskbar = $true
     AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
+    TopMost = $false
 }
+
+# Allow the form to be draggable
+$form.Add_MouseDown({
+    if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+        $form.Capture = $true
+        $form.Tag = [System.Drawing.Point]::Subtract($form.PointToScreen([System.Windows.Forms.Control]::MousePosition), [System.Drawing.Size]$form.Location)
+    }
+})
+
+$form.Add_MouseMove({
+    if ($form.Capture -and $_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+        $form.Location = [System.Drawing.Point]::Subtract($form.PointToScreen([System.Windows.Forms.Control]::MousePosition), [System.Drawing.Size]$form.Tag)
+    }
+})
+
+$form.Add_MouseUp({
+    $form.Capture = $false
+})
 
 # Add logo
 $logo = New-UIElement -type "PictureBox" -properties @{
     ImageLocation = "https://jornada365.cloud/wp-content/uploads/2024/03/Logotipo-Jornada-365-Home.png"
     SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
-    Size = New-Object System.Drawing.Size(200, 70)
-    Location = New-Object System.Drawing.Point(50, 10)
+    Size = New-Object System.Drawing.Size(180, 60)
+    Location = New-Object System.Drawing.Point(20, 10)
 }
 $form.Controls.Add($logo)
 
 # Add title label
 $titleLabel = New-UIElement -type "Label" -properties @{
     Text = "Jornada 365 - Windows Tools"
-    Font = New-Object System.Drawing.Font("Segoe UI", 28, [System.Drawing.FontStyle]::Bold)
-    Size = New-Object System.Drawing.Size(700, 50)
-    Location = New-Object System.Drawing.Point(270, 20)
+    Font = New-Object System.Drawing.Font("Segoe UI", 22, [System.Drawing.FontStyle]::Bold)
+    Size = New-Object System.Drawing.Size(600, 40)
+    Location = New-Object System.Drawing.Point(220, 10)
     TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
 }
 $form.Controls.Add($titleLabel)
@@ -98,17 +117,17 @@ $form.Controls.Add($titleLabel)
 # Add subtitle label
 $subtitleLabel = New-UIElement -type "Label" -properties @{
     Text = "Sua jornada comeca aqui  |  jornada365.cloud"
-    Font = New-Object System.Drawing.Font("Segoe UI", 14)
-    Size = New-Object System.Drawing.Size(700, 30)
-    Location = New-Object System.Drawing.Point(270, 80)
+    Font = New-Object System.Drawing.Font("Segoe UI", 12)
+    Size = New-Object System.Drawing.Size(600, 25)
+    Location = New-Object System.Drawing.Point(220, 50)
     TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
 }
 $form.Controls.Add($subtitleLabel)
 
 # Panel to hold checkboxes
 $panel = New-UIElement -type "Panel" -properties @{
-    Location = New-Object System.Drawing.Point(10, 150)
-    Size = New-Object System.Drawing.Size(1000, 500)
+    Location = New-Object System.Drawing.Point(10, 90)
+    Size = New-Object System.Drawing.Size(920, 480)
     BackColor = [System.Drawing.Color]::White
 }
 $form.Controls.Add($panel)
@@ -133,7 +152,7 @@ function Add-CategoryAndCheckboxes {
         Text = $category
         Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
         Location = New-Object System.Drawing.Point($xPos, $yPos)
-        Size = New-Object System.Drawing.Size(240, 280)
+        Size = New-Object System.Drawing.Size(220, 450)
     }
     $panel.Controls.Add($groupBox)
 
@@ -159,7 +178,7 @@ function Add-CategoryAndCheckboxes {
 # Initialize positions
 $initialXPos = 10
 $initialYPos = 10
-$columnWidth = 250
+$columnWidth = 230
 
 # Add categories and checkboxes to the panel
 $xPos = $initialXPos
@@ -168,14 +187,30 @@ foreach ($category in $categories.Keys) {
     $xPos += $columnWidth
     if ($xPos + $columnWidth > $panel.Width) {
         $xPos = $initialXPos
-        $initialYPos += 300
+        $initialYPos += 470
     }
 }
 
+# Progress bar and label
+$progressLabel = New-UIElement -type "Label" -properties @{
+    Text = "Progresso..."
+    Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    Location = New-Object System.Drawing.Point(10, 580)
+}
+$form.Controls.Add($progressLabel)
+
+$progressBar = New-UIElement -type "ProgressBar" -properties @{
+    Size = New-Object System.Drawing.Size(920, 10)
+    Location = New-Object System.Drawing.Point(10, 610)
+    Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
+    ForeColor = [System.Drawing.Color]::DodgerBlue
+}
+$form.Controls.Add($progressBar)
+
 # Buttons panel
 $buttonPanel = New-UIElement -type "Panel" -properties @{
-    Location = New-Object System.Drawing.Point(10, 660)
-    Size = New-Object System.Drawing.Size(960, 100)
+    Location = New-Object System.Drawing.Point(10, 640)
+    Size = New-Object System.Drawing.Size(920, 60)
     BackColor = [System.Drawing.Color]::White
 }
 $form.Controls.Add($buttonPanel)
@@ -184,7 +219,7 @@ $form.Controls.Add($buttonPanel)
 $executeAllButton = New-UIElement -type "Button" -properties @{
     Text = "Executar Todos"
     Size = New-Object System.Drawing.Size(200, 40)
-    Location = New-Object System.Drawing.Point(80, 10)
+    Location = New-Object System.Drawing.Point(20, 10)
     Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
     FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     BackColor = [System.Drawing.Color]::Black
@@ -202,7 +237,7 @@ $buttonPanel.Controls.Add($executeAllButton)
 $executeSelectedButton = New-UIElement -type "Button" -properties @{
     Text = "Executar Selecionados"
     Size = New-Object System.Drawing.Size(200, 40)
-    Location = New-Object System.Drawing.Point(280, 10)
+    Location = New-Object System.Drawing.Point(240, 10)
     Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
     FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     BackColor = [System.Drawing.Color]::Black
@@ -217,7 +252,7 @@ $buttonPanel.Controls.Add($executeSelectedButton)
 $selectAllButton = New-UIElement -type "Button" -properties @{
     Text = "Selecionar Todos"
     Size = New-Object System.Drawing.Size(200, 40)
-    Location = New-Object System.Drawing.Point(480, 10)
+    Location = New-Object System.Drawing.Point(460, 10)
     Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
     FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
     BackColor = [System.Drawing.Color]::Black
@@ -253,22 +288,6 @@ $closeButton = New-UIElement -type "Button" -properties @{
     $form.Close()
 }
 $buttonPanel.Controls.Add($closeButton)
-
-# Add progress label and progress bar
-$progressLabel = New-UIElement -type "Label" -properties @{
-    Text = "Progresso..."
-    Font = New-Object System.Drawing.Font("Segoe UI", 10)
-    Location = New-Object System.Drawing.Point(10, 770)
-}
-$form.Controls.Add($progressLabel)
-
-$progressBar = New-UIElement -type "ProgressBar" -properties @{
-    Size = New-Object System.Drawing.Size(960, 20)
-    Location = New-Object System.Drawing.Point(10, 800)
-    Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
-    ForeColor = [System.Drawing.Color]::Blue
-}
-$form.Controls.Add($progressBar)
 
 # Function to ensure a service is running
 function Ensure-ServiceRunning {
@@ -414,7 +433,9 @@ function Update-WindowsAndDrivers {
     # Windows Update - including optional updates and fixing common problems
     try {
         Write-Host "Executando atualizacoes do Windows..."
-        Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -AutoReboot
+        # Remover atualizações do Microsoft Defender da lista
+        $updates = Get-WindowsUpdate -MicrosoftUpdate | Where-Object { $_.Title -notmatch "Microsoft Defender" }
+        Install-WindowsUpdate -Update $updates -AcceptAll -AutoReboot
     } catch {
         Handle-Error -operation "atualização do Windows" -exception $_
     }
@@ -675,12 +696,15 @@ function Execute-Tasks {
 
             $completedTasks++
             $progressBar.Value = [math]::Round(($completedTasks / $totalTasks) * 100)
+            $progressBar.Refresh()
         }
     }
 
     $progressLabel.Text = "Conclusão..."
     $progressBar.Value = 100
+    $progressBar.Refresh()
     Log-Message "Todas as operações foram concluídas com sucesso."
+    Log-Message "As configurações de alto desempenho foram aplicadas. Reinicie o computador para concluir a configuração."
     Stop-Logging
 }
 
