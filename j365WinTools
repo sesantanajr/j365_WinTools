@@ -9,95 +9,116 @@ Add-Type -AssemblyName System.Drawing
 # Initialize global checkbox array
 $global:checkboxes = @()
 
-# Function to create a checkbox
-function New-Checkbox {
+# Function to create UI elements
+function New-UIElement {
     param (
-        [string]$text,
-        [int]$x,
-        [int]$y
+        [string]$type,
+        [hashtable]$properties,
+        [scriptblock]$onClick = $null
     )
-    $checkbox = New-Object System.Windows.Forms.CheckBox
-    $checkbox.Text = $text
-    $checkbox.Location = New-Object System.Drawing.Point($x, $y)
-    $checkbox.AutoSize = $true
-    $checkbox.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
-    return $checkbox
+    $element = New-Object ("System.Windows.Forms.$type")
+    foreach ($property in $properties.Keys) {
+        $element.$property = $properties[$property]
+    }
+    if ($onClick -ne $null) {
+        $element.Add_Click($onClick)
+    }
+    return $element
 }
 
-# Function to create a button
-function New-Button {
+# Function to log messages
+function Log-Message {
     param (
-        [string]$text,
-        [int]$x,
-        [int]$y,
-        [scriptblock]$onClick
+        [string]$message,
+        [string]$level = "INFO"
     )
-    $button = New-Object System.Windows.Forms.Button
-    $button.Text = $text
-    $button.Size = New-Object System.Drawing.Size(160, 35)
-    $button.Location = New-Object System.Drawing.Point($x, $y)
-    $button.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
-    $button.FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    $button.BackColor = [System.Drawing.Color]::Black
-    $button.ForeColor = [System.Drawing.Color]::White
-    $button.Cursor = [System.Windows.Forms.Cursors]::Hand
-    $button.Add_Click($onClick)
-    return $button
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logEntry = "$timestamp [$level] $message"
+    Write-Output $logEntry
+    $logEntry | Out-File -FilePath $global:logFile -Append
+}
+
+# Function to handle errors
+function Handle-Error {
+    param (
+        [string]$operation,
+        [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+        [System.Management.Automation.ErrorRecord]$exception
+    )
+    Log-Message "Erro durante ${operation}: $($exception.Exception.Message)" "ERROR"
+    Log-Message "Stack Trace: $($exception.Exception.StackTrace)" "ERROR"
+}
+
+# Function to start logging
+function Start-Logging {
+    $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
+    $global:logFile = "C:\Relatorio\J365_WIN_tools_${timestamp}.log"
+    New-Item -ItemType Directory -Force -Path "C:\Relatorio" | Out-Null
+    New-Item -ItemType File -Force -Path $global:logFile | Out-Null
+    Log-Message "Inicio da execucao do script"
+}
+
+# Function to stop logging
+function Stop-Logging {
+    Log-Message "Fim da execucao do script"
 }
 
 # Create the main form
-$form = New-Object System.Windows.Forms.Form
-$form.Text = "Jornada 365 - Windows Tools"
-$form.Size = New-Object System.Drawing.Size(900, 750)
-$form.StartPosition = "CenterScreen"
-$form.BackColor = [System.Drawing.Color]::White
-$form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
-$form.MaximizeBox = $false
-$form.MinimizeBox = $true
-$form.ShowInTaskbar = $true
-$form.AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
+$form = New-UIElement -type "Form" -properties @{
+    Text = "Jornada 365 - Windows Tools"
+    Size = New-Object System.Drawing.Size(1020, 800)
+    StartPosition = "CenterScreen"
+    BackColor = [System.Drawing.Color]::White
+    FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
+    MaximizeBox = $false
+    MinimizeBox = $true
+    ShowInTaskbar = $true
+    AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
+}
 
 # Add logo
-$logo = New-Object System.Windows.Forms.PictureBox
-$logo.ImageLocation = "https://jornada365.cloud/wp-content/uploads/2024/03/Logotipo-Jornada-365-Home.png"
-$logo.SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::StretchImage
-$logo.Size = New-Object System.Drawing.Size(200, 70)
-$logo.Location = New-Object System.Drawing.Point(30, 10)
+$logo = New-UIElement -type "PictureBox" -properties @{
+    ImageLocation = "https://jornada365.cloud/wp-content/uploads/2024/03/Logotipo-Jornada-365-Home.png"
+    SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+    Size = New-Object System.Drawing.Size(200, 70)
+    Location = New-Object System.Drawing.Point(50, 10)
+}
 $form.Controls.Add($logo)
 
 # Add title label
-$titleLabel = New-Object System.Windows.Forms.Label
-$titleLabel.Text = "Jornada 365 - Windows Tools"
-$titleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 22, [System.Drawing.FontStyle]::Bold)
-$titleLabel.Size = New-Object System.Drawing.Size(600, 40)
-$titleLabel.Location = New-Object System.Drawing.Point(270, 10)
-$titleLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$titleLabel = New-UIElement -type "Label" -properties @{
+    Text = "Jornada 365 - Windows Tools"
+    Font = New-Object System.Drawing.Font("Segoe UI", 28, [System.Drawing.FontStyle]::Bold)
+    Size = New-Object System.Drawing.Size(700, 50)
+    Location = New-Object System.Drawing.Point(270, 20)
+    TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+}
 $form.Controls.Add($titleLabel)
 
 # Add subtitle label
-$subtitleLabel = New-Object System.Windows.Forms.Label
-$subtitleLabel.Text = "Sua jornada comeca aqui | jornada365.cloud"
-$subtitleLabel.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Regular)
-$subtitleLabel.Size = New-Object System.Drawing.Size(600, 30)
-$subtitleLabel.Location = New-Object System.Drawing.Point(270, 60)
-$subtitleLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+$subtitleLabel = New-UIElement -type "Label" -properties @{
+    Text = "Sua jornada comeca aqui  |  jornada365.cloud"
+    Font = New-Object System.Drawing.Font("Segoe UI", 14)
+    Size = New-Object System.Drawing.Size(700, 30)
+    Location = New-Object System.Drawing.Point(270, 80)
+    TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+}
 $form.Controls.Add($subtitleLabel)
 
 # Panel to hold checkboxes
-$panel = New-Object System.Windows.Forms.Panel
-$panel.Location = New-Object System.Drawing.Point(10, 100)
-$panel.Size = New-Object System.Drawing.Size(860, 360)
-$panel.AutoScroll = $true
-$panel.BorderStyle = [System.Windows.Forms.BorderStyle]::FixedSingle
-$panel.BackColor = [System.Drawing.Color]::White
+$panel = New-UIElement -type "Panel" -properties @{
+    Location = New-Object System.Drawing.Point(10, 150)
+    Size = New-Object System.Drawing.Size(1000, 500)
+    BackColor = [System.Drawing.Color]::White
+}
 $form.Controls.Add($panel)
 
 # Categories and checkboxes
 $categories = @{
-    "Microsoft" = @("Microsoft 365", "Microsoft Teams Trabalho", "Microsoft Teams Pessoal", "PowerShell 7", "Microsoft Graph", "OneDrive", "NetFramework", "Microsoft Visual C++")
+    "Microsoft" = @("Microsoft 365", "Microsoft Teams Trabalho", "Microsoft Teams Pessoal", "PowerShell 7", "Microsoft Graph", "OneDrive", "DotNet", "Microsoft.VCRedist.2015+.x64")
     "Navegadores" = @("Arc", "Firefox", "Chrome", "Opera GX", "Opera One", "Edge", "Vivaldi", "Brave")
     "Utilitarios" = @("7zip", "AnyDesk", "TeamViewer", "Remote Desktop Manager", "FortiClient VPN", "ScreenShot HD", "Lightshot", "Telegram", "Discord", "WhatsApp Web")
-    "Sistema" = @("Hyper-V", "Windows SandBox", "Winget", "Atualizar todas as aplicacoes", "Atualizar Windows e Drivers", "Limpeza completa de disco", "Manutencao do Windows", "Modo Alto Desempenho", "Otimizar Windows", "Chocolatey")
+    "Sistema" = @("Hyper-V", "Windows SandBox", "Winget", "Atualizar todas as aplicacoes", "Atualizar Windows e Drivers", "Limpeza completa de disco", "Manutencao do Windows", "Modo Alto Desempenho", "Otimizar Windows")
 }
 
 # Function to create and align category labels and checkboxes
@@ -108,44 +129,69 @@ function Add-CategoryAndCheckboxes {
         [int]$xPos,
         [int]$yPos
     )
-    $label = New-Object System.Windows.Forms.Label
-    $label.Text = $category
-    $label.Font = New-Object System.Drawing.Font("Segoe UI", 14, [System.Drawing.FontStyle]::Bold)
-    $label.Location = New-Object System.Drawing.Point($xPos, $yPos)
-    $label.AutoSize = $true
-    $panel.Controls.Add($label)
-    $yPos += 30
+    $groupBox = New-UIElement -type "GroupBox" -properties @{
+        Text = $category
+        Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+        Location = New-Object System.Drawing.Point($xPos, $yPos)
+        Size = New-Object System.Drawing.Size(240, 280)
+    }
+    $panel.Controls.Add($groupBox)
 
+    $yPos = 20
     foreach ($item in $items) {
-        $checkbox = New-Checkbox -text $item -x $xPos -y $yPos
-        $panel.Controls.Add($checkbox)
+        $checkbox = New-UIElement -type "CheckBox" -properties @{
+            Text = $item
+            Location = New-Object System.Drawing.Point(10, $yPos)
+            AutoSize = $true
+            Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+            BackColor = [System.Drawing.Color]::White
+        }
+        $groupBox.Controls.Add($checkbox)
         $global:checkboxes += $checkbox
         $yPos += 30
+
+        # Add tooltip
+        $tooltip = New-Object System.Windows.Forms.ToolTip
+        $tooltip.SetToolTip($checkbox, "Instalação do $item")
     }
-    return $yPos
 }
 
 # Initialize positions
 $initialXPos = 10
 $initialYPos = 10
-$columnWidth = 210
+$columnWidth = 250
 
 # Add categories and checkboxes to the panel
 $xPos = $initialXPos
 foreach ($category in $categories.Keys) {
-    $yPos = Add-CategoryAndCheckboxes -category $category -items $categories[$category] -xPos $xPos -yPos $initialYPos
+    Add-CategoryAndCheckboxes -category $category -items $categories[$category] -xPos $xPos -yPos $initialYPos
     $xPos += $columnWidth
+    if ($xPos + $columnWidth > $panel.Width) {
+        $xPos = $initialXPos
+        $initialYPos += 300
+    }
 }
 
 # Buttons panel
-$buttonPanel = New-Object System.Windows.Forms.Panel
-$buttonPanel.Location = New-Object System.Drawing.Point(10, 480)
-$buttonPanel.Size = New-Object System.Drawing.Size(860, 100)
-$buttonPanel.BackColor = [System.Drawing.Color]::White
+$buttonPanel = New-UIElement -type "Panel" -properties @{
+    Location = New-Object System.Drawing.Point(10, 660)
+    Size = New-Object System.Drawing.Size(960, 100)
+    BackColor = [System.Drawing.Color]::White
+}
 $form.Controls.Add($buttonPanel)
 
 # Add buttons
-$executeAllButton = New-Button -text "Executar Todos" -x 80 -y 10 -onClick {
+$executeAllButton = New-UIElement -type "Button" -properties @{
+    Text = "Executar Todos"
+    Size = New-Object System.Drawing.Size(200, 40)
+    Location = New-Object System.Drawing.Point(80, 10)
+    Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    BackColor = [System.Drawing.Color]::Black
+    ForeColor = [System.Drawing.Color]::White
+    TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    Cursor = [System.Windows.Forms.Cursors]::Hand
+} -onClick {
     foreach ($checkbox in $global:checkboxes) {
         $checkbox.Checked = $true
     }
@@ -153,12 +199,32 @@ $executeAllButton = New-Button -text "Executar Todos" -x 80 -y 10 -onClick {
 }
 $buttonPanel.Controls.Add($executeAllButton)
 
-$executeSelectedButton = New-Button -text "Executar Selecionados" -x 260 -y 10 -onClick {
+$executeSelectedButton = New-UIElement -type "Button" -properties @{
+    Text = "Executar Selecionados"
+    Size = New-Object System.Drawing.Size(200, 40)
+    Location = New-Object System.Drawing.Point(280, 10)
+    Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    BackColor = [System.Drawing.Color]::Black
+    ForeColor = [System.Drawing.Color]::White
+    TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    Cursor = [System.Windows.Forms.Cursors]::Hand
+} -onClick {
     Execute-Tasks
 }
 $buttonPanel.Controls.Add($executeSelectedButton)
 
-$selectAllButton = New-Button -text "Selecionar Todos" -x 440 -y 10 -onClick {
+$selectAllButton = New-UIElement -type "Button" -properties @{
+    Text = "Selecionar Todos"
+    Size = New-Object System.Drawing.Size(200, 40)
+    Location = New-Object System.Drawing.Point(480, 10)
+    Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    BackColor = [System.Drawing.Color]::Black
+    ForeColor = [System.Drawing.Color]::White
+    TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    Cursor = [System.Windows.Forms.Cursors]::Hand
+} -onClick {
     if ($selectAllButton.Text -eq "Selecionar Todos") {
         foreach ($checkbox in $global:checkboxes) {
             $checkbox.Checked = $true
@@ -173,108 +239,184 @@ $selectAllButton = New-Button -text "Selecionar Todos" -x 440 -y 10 -onClick {
 }
 $buttonPanel.Controls.Add($selectAllButton)
 
-$closeButton = New-Button -text "Encerrar" -x 620 -y 10 -onClick {
+$closeButton = New-UIElement -type "Button" -properties @{
+    Text = "Encerrar"
+    Size = New-Object System.Drawing.Size(200, 40)
+    Location = New-Object System.Drawing.Point(680, 10)
+    Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+    FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+    BackColor = [System.Drawing.Color]::Black
+    ForeColor = [System.Drawing.Color]::White
+    TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+    Cursor = [System.Windows.Forms.Cursors]::Hand
+} -onClick {
     $form.Close()
 }
 $buttonPanel.Controls.Add($closeButton)
 
-# Function to check if a service is running and start it if not
+# Add progress label and progress bar
+$progressLabel = New-UIElement -type "Label" -properties @{
+    Text = "Progresso..."
+    Font = New-Object System.Drawing.Font("Segoe UI", 10)
+    Location = New-Object System.Drawing.Point(10, 770)
+}
+$form.Controls.Add($progressLabel)
+
+$progressBar = New-UIElement -type "ProgressBar" -properties @{
+    Size = New-Object System.Drawing.Size(960, 20)
+    Location = New-Object System.Drawing.Point(10, 800)
+    Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
+    ForeColor = [System.Drawing.Color]::Blue
+}
+$form.Controls.Add($progressBar)
+
+# Function to ensure a service is running
 function Ensure-ServiceRunning {
     param (
         [string]$serviceName
     )
-    Write-Output "Verificando status do servico: $serviceName"
-    $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-    if ($service.Status -ne 'Running') {
-        Write-Output "Iniciando servico: $serviceName"
-        Start-Service -Name $serviceName
-        Write-Output "$serviceName iniciado."
-    } else {
-        Write-Output "$serviceName ja esta em execucao."
+    try {
+        Log-Message "Verificando status do serviço: ${serviceName}"
+        $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+        if ($service.Status -ne 'Running') {
+            Log-Message "Iniciando serviço: ${serviceName}"
+            Start-Service -Name $serviceName
+            Log-Message "${serviceName} iniciado."
+        } else {
+            Log-Message "${serviceName} já está em execução."
+        }
+    } catch {
+        Handle-Error -operation "verificar ou iniciar o serviço ${serviceName}" -exception $_
     }
 }
 
-# Function to stop a service
+# Function to stop a service if running
 function Stop-ServiceIfRunning {
     param (
         [string]$serviceName
     )
-    Write-Output "Verificando status do servico: $serviceName"
-    $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
-    if ($service.Status -eq 'Running') {
-        Write-Output "Parando servico: $serviceName"
-        Stop-Service -Name $serviceName -Force
-        Write-Output "$serviceName parado."
-    } else {
-        Write-Output "$serviceName ja esta parado."
+    try {
+        Log-Message "Verificando status do serviço: ${serviceName}"
+        $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+        if ($service.Status -eq 'Running') {
+            Log-Message "Parando serviço: ${serviceName}"
+            Stop-Service -Name $serviceName -Force
+            Log-Message "${serviceName} parado."
+        } else {
+            Log-Message "${serviceName} já está parado."
+        }
+    } catch {
+        Handle-Error -operation "verificar ou parar o serviço ${serviceName}" -exception $_
     }
 }
 
-# Function to check if Winget is installed and install if necessary
+# Function to ensure Winget is installed
 function Ensure-WingetInstalled {
-    Write-Output "Verificando se Winget esta instalado..."
-    if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-        Write-Output "Winget nao encontrado, instalando..."
-        Invoke-WebRequest -Uri "https://aka.ms/getwinget" -OutFile "$env:temp\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
-        Add-AppxPackage -Path "$env:temp\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
-    } else {
-        Write-Output "Winget ja esta instalado."
+    try {
+        Log-Message "Verificando se Winget está instalado..."
+        if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            Log-Message "Winget não encontrado, instalando..."
+            Invoke-WebRequest -Uri "https://aka.ms/getwinget" -OutFile "$env:temp\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+            Add-AppxPackage -Path "$env:temp\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle"
+        } else {
+            Log-Message "Winget já está instalado."
+        }
+    } catch {
+        Handle-Error -operation "verificar ou instalar Winget" -exception $_
     }
 }
 
-# Function to install or update applications using winget
+# Function to ensure Scoop is installed
+function Ensure-ScoopInstalled {
+    try {
+        Log-Message "Verificando se Scoop está instalado..."
+        if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
+            Log-Message "Scoop não encontrado, instalando..."
+            Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
+            Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
+            Log-Message "Scoop instalado."
+        } else {
+            Log-Message "Scoop já está instalado."
+        }
+    } catch {
+        Handle-Error -operation "verificar ou instalar Scoop" -exception $_
+    }
+}
+
+# Function to install or update applications
 function InstallOrUpdate-Application {
     param (
-        [string]$appId
+        [string]$appId,
+        [string]$packageManager = "winget"
     )
-    Write-Output "Verificando instalacao ou atualizacao do aplicativo: $appId"
-    $installedApp = winget list | Where-Object { $_ -match $appId }
-    if ($installedApp) {
-        Write-Output "Aplicativo $appId encontrado. Atualizando..."
-        Start-Process "winget" -ArgumentList "upgrade --id $appId --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
-    } else {
-        Write-Output "Instalando aplicativo: $appId"
-        Start-Process "winget" -ArgumentList "install --id $appId --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
-    }
-}
-
-# Function to install dependencies
-function Install-Dependencies {
-    Write-Output "Instalando dependencias padrao..."
-    $dependencies = @(
-        "Microsoft.VCRedist.2015+.x64"
-    )
-    foreach ($dependency in $dependencies) {
-        Write-Output "Instalando dependencia: $dependency"
-        Start-Process "winget" -ArgumentList "install --id $dependency --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
-    }
-}
-
-# Function to update all applications using winget
-function Update-AllApplications {
-    Write-Output "Atualizando todas as aplicacoes..."
     try {
+        Log-Message "Verificando instalação ou atualização do aplicativo: ${appId} com ${packageManager}"
+        if ($packageManager -eq "winget") {
+            $installedApp = winget list | Where-Object { $_ -match $appId }
+        } elseif ($packageManager -eq "choco") {
+            $installedApp = choco list --local-only | Where-Object { $_ -match $appId }
+        }
+        if ($installedApp) {
+            Log-Message "Aplicativo ${appId} encontrado. Atualizando..."
+            Start-Process $packageManager -ArgumentList "upgrade --id $appId --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
+        } else {
+            Log-Message "Instalando aplicativo: ${appId}"
+            Start-Process $packageManager -ArgumentList "install --id $appId --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
+        }
+    } catch {
+        Handle-Error -operation "instalar ou atualizar o aplicativo ${appId} com ${packageManager}" -exception $_
+    }
+}
+
+# Function to update all applications
+function Update-AllApplications {
+    try {
+        Log-Message "Atualizando todas as aplicações..."
+        Ensure-WingetInstalled
+        Ensure-ChocolateyInstalled
+        Ensure-ScoopInstalled
         Start-Process "winget" -ArgumentList "source update" -NoNewWindow -Wait
         Start-Process "winget" -ArgumentList "upgrade winget" -NoNewWindow -Wait
         Start-Process "winget" -ArgumentList "upgrade --all --silent --accept-package-agreements --accept-source-agreements --force --include-unknown" -NoNewWindow -Wait
+        Start-Process "choco" -ArgumentList "upgrade all -y --force" -NoNewWindow -Wait
+        Start-Process "scoop" -ArgumentList "update *" -NoNewWindow -Wait
     } catch {
-        Write-Output "Erro ao atualizar todas as aplicacoes: $_"
+        Handle-Error -operation "atualizar todas as aplicações" -exception $_
+    }
+
+    # Update Pip packages
+    try {
+        Log-Message "Atualizando pacotes pip..."
+        Start-Process "pip" -ArgumentList "install --upgrade pip" -NoNewWindow -Wait
+        Start-Process "pip" -ArgumentList "list --outdated --format=freeze | %{$_.split('==')[0]} | % {pip install --upgrade $_}" -NoNewWindow -Wait
+    } catch {
+        Handle-Error -operation "atualizar pacotes pip" -exception $_
+    }
+
+    # Update npm packages
+    try {
+        Log-Message "Atualizando pacotes npm..."
+        Start-Process "winget" -ArgumentList "install --id OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
+    } catch {
+        Handle-Error -operation "atualizar pacotes npm" -exception $_
     }
 }
 
-# Function to update Windows and drivers, including optional updates and fixing common problems
+# Function to update Windows and drivers
 function Update-WindowsAndDrivers {
-    Write-Output "Atualizando Windows e drivers..."
+    Log-Message "Atualizando Windows e drivers..."
 
     # Ensure BITS and Windows Installer services are running
     Ensure-ServiceRunning -serviceName "BITS"
     Ensure-ServiceRunning -serviceName "msiserver"
+    Ensure-ServiceRunning -serviceName "wuauserv"
 
     # Windows Update - including optional updates and fixing common problems
     try {
-        Install-WindowsUpdate -AcceptAll -AutoReboot -IncludeOptional
+        Write-Host "Executando atualizacoes do Windows..."
+        Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -AutoReboot
     } catch {
-        Write-Output "Erro durante a atualizacao do Windows: $_"
+        Handle-Error -operation "atualização do Windows" -exception $_
     }
 
     # Fix common Windows Update issues
@@ -292,7 +434,7 @@ function Update-WindowsAndDrivers {
                 }
                 Ensure-ServiceRunning -serviceName "wuauserv"
             } catch {
-                Write-Output "Erro ao mover SoftwareDistribution: $($_.Exception.Message)"
+                Handle-Error -operation "mover SoftwareDistribution" -exception $_
             }
         },
         {
@@ -304,7 +446,7 @@ function Update-WindowsAndDrivers {
                 }
                 Ensure-ServiceRunning -serviceName "cryptSvc"
             } catch {
-                Write-Output "Erro ao mover catroot2: $($_.Exception.Message)"
+                Handle-Error -operation "mover catroot2" -exception $_
             }
         },
         "net start wuauserv",
@@ -315,27 +457,31 @@ function Update-WindowsAndDrivers {
 
     foreach ($fix in $updateFixes) {
         try {
-            Write-Output "Executando comando: $fix"
+            Log-Message "Executando comando: ${fix}"
             if ($fix -is [ScriptBlock]) {
                 & $fix
             } else {
                 Invoke-Expression $fix
             }
         } catch {
-            Write-Output ("Erro ao executar {0}: {1}" -f $fix, $_.Exception.Message)
+            Handle-Error -operation ("executar comando {0}" -f $fix) -exception $_
         }
     }
 }
 
 # Function to perform a complete disk cleanup
 function Complete-DiskCleanup {
-    Write-Output "Executando limpeza completa de disco..."
-    Cleanmgr /sagerun:1
+    try {
+        Log-Message "Executando limpeza completa de disco..."
+        Cleanmgr /sagerun:1
+    } catch {
+        Handle-Error -operation "limpeza completa de disco" -exception $_
+    }
 }
 
 # Function to clean temporary files and cache
 function Clean-TemporaryFiles {
-    Write-Output "Limpando arquivos temporarios e cache..."
+    Log-Message "Limpando arquivos temporários e cache..."
     $tempPaths = @(
         "$env:LOCALAPPDATA\Temp\*",
         "$env:windir\Temp\*",
@@ -345,164 +491,155 @@ function Clean-TemporaryFiles {
     )
     foreach ($path in $tempPaths) {
         try {
-            Write-Output "Limpando: $path"
+            Log-Message "Limpando: ${path}"
             Remove-Item -Path $path -Recurse -Force -ErrorAction Stop
         } catch {
-            Write-Output "Erro ao limpar ${path}: $($_.Exception.Message)"
+            Handle-Error -operation ("limpar {0}" -f $path) -exception $_
         }
     }
-    Write-Output "Limpeza de arquivos temporarios e cache concluida."
+    Log-Message "Limpeza de arquivos temporários e cache concluída."
 }
 
 # Function to activate Hyper-V
 function Activate-HyperV {
-    Write-Output "Verificando se o Hyper-V pode ser ativado..."
-    $windowsEdition = (Get-WmiObject -Class Win32_OperatingSystem).Caption
-    if ($windowsEdition -match "Windows 10 Home") {
-        Write-Output "Hyper-V nao e suportado no Windows 10 Home."
-    } else {
-        Write-Output "Ativando Hyper-V..."
-        Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRestart
-        Write-Output "Hyper-V ativado."
+    try {
+        Log-Message "Verificando se o Hyper-V pode ser ativado..."
+        $windowsEdition = (Get-WmiObject -Class Win32_OperatingSystem).Caption
+        if ($windowsEdition -match "Windows 10 Home") {
+            Log-Message "Hyper-V não é suportado no Windows 10 Home."
+        } else {
+            Log-Message "Ativando Hyper-V..."
+            Enable-WindowsOptionalFeature -Online -FeatureName Microsoft-Hyper-V-All -NoRestart
+            Log-Message "Hyper-V ativado."
+        }
+    } catch {
+        Handle-Error -operation "ativar Hyper-V" -exception $_
     }
 }
 
 # Function to install Windows Sandbox
 function Install-WindowsSandbox {
-    Write-Output "Instalando Windows Sandbox..."
-    Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -NoRestart
-    Write-Output "Windows Sandbox instalado."
+    try {
+        Log-Message "Instalando Windows Sandbox..."
+        Enable-WindowsOptionalFeature -Online -FeatureName "Containers-DisposableClientVM" -NoRestart
+        Log-Message "Windows Sandbox instalado."
+    } catch {
+        Handle-Error -operation "instalar Windows Sandbox" -exception $_
+    }
 }
 
 # Function to apply high performance power plan settings
 function Apply-HighPerformanceSettings {
-    Write-Output "Aplicando configuracoes de alto desempenho..."
-    REG ADD HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer /v NoClose /t REG_DWORD /d 0 /f
-    REG ADD HKLM\SYSTEM\CurrentControlSet\Control\Power /v CsEnabled /t REG_DWORD /d 0 /f
-    Write-Output "Configuracoes de alto desempenho aplicadas. Reinicie o computador para concluir a configuracao."
+    try {
+        Log-Message "Aplicando configurações de alto desempenho..."
+        REG ADD HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\Explorer /v NoClose /t REG_DWORD /d 0 /f
+        REG ADD HKLM\SYSTEM\CurrentControlSet\Control\Power /v CsEnabled /t REG_DWORD /d 0 /f
+        Log-Message "Configurações de alto desempenho aplicadas. Reinicie o computador para concluir a configuração."
+    } catch {
+        Handle-Error -operation "aplicar configurações de alto desempenho" -exception $_
+    }
 }
 
 # Function to perform system maintenance
 function Perform-WindowsMaintenance {
-    Write-Output "Executando manutencao do Windows..."
+    Log-Message "Executando manutenção do Windows..."
     $timestamp = Get-Date -Format "dd_MM_yyyy_HH_mm"
     $maintenanceLog = "C:\Relatorio\J365_WIN_Maintenance_${timestamp}.txt"
 
     if (-not (Test-Path $maintenanceLog) -or ((Get-Date) - (Get-Item $maintenanceLog).LastWriteTime).TotalHours -gt 1) {
-        Start-Process "sfc" -ArgumentList "/scannow" -NoNewWindow -Wait
-        Start-Process "DISM" -ArgumentList "/Online /Cleanup-Image /RestoreHealth" -NoNewWindow -Wait
-        Start-Process "DISM" -ArgumentList "/Online /Cleanup-Image /StartComponentCleanup" -NoNewWindow -Wait
-        Write-Output "Manutencao do Windows concluida."
-        Write-Output "Atualizando politicas de grupo..."
-        gpupdate /force | Out-File -FilePath $maintenanceLog -Append
-        Write-Output "Limpando DNS..."
-        ipconfig /flushdns | Out-File -FilePath $maintenanceLog -Append
+        try {
+            Start-Process "sfc" -ArgumentList "/scannow" -NoNewWindow -Wait
+            Start-Process "DISM" -ArgumentList "/Online /Cleanup-Image /RestoreHealth" -NoNewWindow -Wait
+            Start-Process "DISM" -ArgumentList "/Online /Cleanup-Image /StartComponentCleanup" -NoNewWindow -Wait
+            Log-Message "Manutenção do Windows concluída."
+            Log-Message "Atualizando políticas de grupo..."
+            gpupdate /force | Out-File -FilePath $maintenanceLog -Append
+            Log-Message "Limpando DNS..."
+            ipconfig /flushdns | Out-File -FilePath $maintenanceLog -Append
+        } catch {
+            Handle-Error -operation "manutenção do Windows" -exception $_
+        }
     } else {
-        Write-Output "Manutencao do Windows ja realizada recentemente. Pulando etapa."
+        Log-Message "Manutenção do Windows já realizada recentemente. Pulando etapa."
     }
 }
 
 # Function to optimize Windows for performance
 function Optimize-Windows {
-    Write-Output "Otimizando o Windows para desempenho..."
-    
-    # Disable unnecessary startup programs
-    Get-CimInstance Win32_StartupCommand | ForEach-Object {
-        Write-Output "Desativando programa de inicializacao: $($_.Name)"
-        try {
-            $_ | Remove-CimInstance -ErrorAction Stop
-        } catch {
-            Write-Output "Erro ao desativar o programa de inicializacao: $($_.Exception.Message)"
-        }
-    }
+    Log-Message "Otimizando o Windows para desempenho..."
 
     # Set visual effects for best performance
-    $visualEffectsKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects"
-    Set-ItemProperty -Path $visualEffectsKey -Name "VisualFXSetting" -Value 2
-
-    # Disable unnecessary services
-    $servicesToDisable = @("DiagTrack", "SysMain", "WSearch", "DiagTrack", "dmwappushservice")
-    foreach ($service in $servicesToDisable) {
-        try {
-            Set-Service -Name $service -StartupType Disabled
-            Stop-Service -Name $service -Force
-            Write-Output "Servico ${service} desativado."
-        } catch {
-            Write-Output "Erro ao desativar o servico ${service}: $_"
-        }
+    try {
+        $visualEffectsKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects"
+        Set-ItemProperty -Path $visualEffectsKey -Name "VisualFXSetting" -Value 2
+    } catch {
+        Handle-Error -operation "configurar os efeitos visuais" -exception $_
     }
 
-    Write-Output "Otimizacao do Windows concluida."
+    Log-Message "Otimização do Windows concluída."
 }
 
 # Function to install or update Chocolatey
 function Ensure-ChocolateyInstalled {
-    Write-Output "Verificando se Chocolatey esta instalado..."
-    if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-        Write-Output "Chocolatey nao encontrado, instalando..."
-        Set-ExecutionPolicy Bypass -Scope Process -Force
-        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-        Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-        Write-Output "Chocolatey instalado."
-    } else {
-        Write-Output "Chocolatey ja esta instalado. Atualizando..."
-        choco upgrade chocolatey -y --force
-    }
-}
-
-# Function to install or update applications using Chocolatey
-function InstallOrUpdate-ApplicationChoco {
-    param (
-        [string]$appId
-    )
-    Write-Output "Verificando instalacao ou atualizacao do aplicativo: $appId"
-    $installedApp = choco list --local-only | Where-Object { $_ -match $appId }
-    if ($installedApp) {
-        Write-Output "Aplicativo $appId encontrado. Atualizando..."
-        choco upgrade $appId -y --force
-    } else {
-        Write-Output "Instalando aplicativo: $appId"
-        choco install $appId -y --force
-    }
-}
-
-# Function to update all applications using Chocolatey
-function Update-AllApplicationsChoco {
-    Write-Output "Atualizando todas as aplicacoes com Chocolatey..."
     try {
-        choco upgrade all -y --force
+        Log-Message "Verificando se Chocolatey está instalado..."
+        if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+            Log-Message "Chocolatey não encontrado, instalando..."
+            Set-ExecutionPolicy Bypass -Scope Process -Force
+            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
+            Log-Message "Chocolatey instalado."
+        } else {
+            Log-Message "Chocolatey já está instalado. Atualizando..."
+            choco upgrade chocolatey -y --force
+        }
     } catch {
-        Write-Output "Erro ao atualizar todas as aplicacoes com Chocolatey: $_"
+        if ($_.Exception.Message -match "An existing Chocolatey installation was detected") {
+            Log-Message "Instalação existente do Chocolatey detectada. Atualizando em vez de instalar." "WARNING"
+            try {
+                choco upgrade chocolatey -y --force
+            } catch {
+                Handle-Error -operation "atualizar Chocolatey" -exception $_
+            }
+        } else {
+            Handle-Error -operation "verificar ou instalar Chocolatey" -exception $_
+        }
     }
+}
+
+# Function to force close processes
+function Force-CloseProcesses {
+    param (
+        [string]$processName
+    )
+    Get-Process -Name $processName -ErrorAction SilentlyContinue | Stop-Process -Force
 }
 
 # Function to execute tasks based on selected checkboxes
 function Execute-Tasks {
-    $timestamp = Get-Date -Format "dd_MM_yyyy_HH_mm"
-    $logFile = "C:\Relatorio\J365_WIN_tools_${timestamp}.txt"
-    New-Item -ItemType Directory -Force -Path "C:\Relatorio"
-    New-Item -ItemType File -Force -Path $logFile
+    Start-Logging
 
     $progressLabel.Text = "Iniciando..."
     $progressBar.Value = 0
 
     $completedTasks = 0
+    $totalTasks = ($global:checkboxes | Where-Object { $_.Checked }).Count
 
     foreach ($checkbox in $global:checkboxes) {
         if ($checkbox.Checked) {
             $progressLabel.Text = "Executando $($checkbox.Text)..."
-            Write-Output "Executando $($checkbox.Text)..." | Out-File -FilePath $logFile -Append
+            Log-Message "Executando $($checkbox.Text)..."
 
             try {
                 switch ($checkbox.Text) {
                     "Microsoft 365" { InstallOrUpdate-Application "Microsoft.Office" }
-                    "Microsoft Teams Trabalho" { Install-Update-Teams }
-                    "Microsoft Teams Pessoal" { Install-Update-Teams }
+                    "Microsoft Teams Trabalho" { InstallOrUpdate-Application "Microsoft.Teams" }
+                    "Microsoft Teams Pessoal" { InstallOrUpdate-Application "Microsoft.Teams.Free" }
                     "PowerShell 7" { InstallOrUpdate-Application "Microsoft.PowerShell" }
                     "Microsoft Graph" { InstallOrUpdate-Application "Microsoft.Graph" }
-                    "OneDrive" { Install-Update-OneDrive }
-                    "NetFramework" { InstallOrUpdate-Application "Microsoft.NetFramework" }
-                    "Microsoft Visual C++" { Install-Dependencies }
+                    "OneDrive" { InstallOrUpdate-Application "Microsoft.OneDrive" }
+                    "DotNet" { InstallOrUpdate-Application "Microsoft.DotNet" }
+                    "Microsoft.VCRedist.2015+.x64" { InstallOrUpdate-Application "Microsoft.VCRedist.2015+.x64" }
                     "Arc" { InstallOrUpdate-Application "Arc.Browser" }
                     "Firefox" { InstallOrUpdate-Application "Mozilla.Firefox" }
                     "Chrome" { InstallOrUpdate-Application "Google.Chrome" }
@@ -524,83 +661,28 @@ function Execute-Tasks {
                     "Hyper-V" { Activate-HyperV }
                     "Windows SandBox" { Install-WindowsSandbox }
                     "Winget" { Ensure-WingetInstalled }
-                    "Atualizar todas as aplicacoes" { 
-                        Update-AllApplications 
-                        Update-AllApplicationsChoco 
-                    }
+                    "Atualizar todas as aplicacoes" { Update-AllApplications }
                     "Atualizar Windows e Drivers" { Update-WindowsAndDrivers }
                     "Limpeza completa de disco" { Complete-DiskCleanup }
                     "Manutencao do Windows" { Perform-WindowsMaintenance }
                     "Modo Alto Desempenho" { Apply-HighPerformanceSettings }
                     "Otimizar Windows" { Optimize-Windows }
-                    "Chocolatey" { Ensure-ChocolateyInstalled }
+                    default { Log-Message "Tarefa desconhecida: $($checkbox.Text)" "WARNING" }
                 }
             } catch {
-                Write-Output "Erro ao executar $($checkbox.Text): $_" | Out-File -FilePath $logFile -Append
+                Handle-Error -operation "executar $($checkbox.Text)" -exception $_
             }
 
             $completedTasks++
-            $progressBar.Value = [math]::Round(($completedTasks / $global:checkboxes.Count) * 100)
+            $progressBar.Value = [math]::Round(($completedTasks / $totalTasks) * 100)
         }
     }
 
-    $progressLabel.Text = "Concluido"
-    Write-Output "Modo Alto Desempenho configurado. Reinicie o sistema para aplicar as configuracoes. Depois disso, mude para o plano de energia que preferir."
+    $progressLabel.Text = "Conclusão..."
+    $progressBar.Value = 100
+    Log-Message "Todas as operações foram concluídas com sucesso."
+    Stop-Logging
 }
 
-# Add progress bar and label
-$progressBar = New-Object System.Windows.Forms.ProgressBar
-$progressBar.Location = New-Object System.Drawing.Point(10, 600)
-$progressBar.Size = New-Object System.Drawing.Size(860, 15)
-$progressBar.Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
-$progressBar.ForeColor = [System.Drawing.Color]::DodgerBlue
-$progressBar.BackColor = [System.Drawing.Color]::White
-$progressBar.Value = 0
-$form.Controls.Add($progressBar)
-
-$progressLabel = New-Object System.Windows.Forms.Label
-$progressLabel.Text = "Pronto"
-$progressLabel.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
-$progressLabel.Size = New-Object System.Drawing.Size(860, 20)
-$progressLabel.Location = New-Object System.Drawing.Point(10, 630)
-$progressLabel.TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-$form.Controls.Add($progressLabel)
-
-# Show the form
+# Run the form
 [void]$form.ShowDialog()
-
-# Script to handle package sources and BITS service
-try {
-    # Clean and add sources
-    $packageSources = Get-PackageSource -ErrorAction SilentlyContinue
-    if (-not ($packageSources | Where-Object { $_.Name -eq "msstore" })) {
-        Register-PackageSource -Name "msstore" -Location "https://store.microsoft.com/api/v2" -ProviderName "NuGet" -Trusted
-    }
-
-    if (-not ($packageSources | Where-Object { $_.Name -eq "PSGallery" })) {
-        Register-PackageSource -Name "PSGallery" -Location "https://www.powershellgallery.com/api/v2" -ProviderName "NuGet" -Trusted
-    }
-
-    # Remove Update-Module commands
-    # Removed Update-Module -Name Microsoft.PowerShell.Security -Force
-    # Removed Update-Module -Name PowerShellGet -Force
-
-    # Test Connectivity to Microsoft Store API
-    $response = Invoke-WebRequest -Uri "https://store.microsoft.com/api/v2" -UseBasicParsing
-    if ($response.StatusCode -eq 200) {
-        Write-Output "Conexao com a API da Microsoft Store bem-sucedida."
-    } else {
-        Write-Error "Falha ao conectar a API da Microsoft Store."
-    }
-
-    # Check and Restart BITS Service
-    $bitsStatus = Get-Service -Name BITS
-    if ($bitsStatus.Status -ne "Running") {
-        Restart-Service -Name BITS -Force
-    }
-
-    Write-Output "Todas as operacoes foram concluidas com sucesso."
-
-} catch {
-    Write-Error "Ocorreu um erro: $_"
-}
