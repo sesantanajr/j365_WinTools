@@ -4,6 +4,9 @@ Add-Type -AssemblyName System.Drawing
 
 # Initialize global checkbox array
 $global:checkboxes = @()
+$global:totalTasks = 0
+$global:completedTasks = 0
+$global:tasksPerStep = 1
 
 # Function to create UI elements
 function New-UIElement {
@@ -43,6 +46,7 @@ function Handle-Error {
     )
     Log-Message "Erro durante ${operation}: $($exception.Exception.Message)" "ERROR"
     Log-Message "Stack Trace: $($exception.Exception.StackTrace)" "ERROR"
+    Update-Progress -increment 0
 }
 
 # Function to start logging
@@ -56,7 +60,23 @@ function Start-Logging {
 
 # Function to stop logging
 function Stop-Logging {
-    Log-Message "Fim da execucao do script"
+    Log-Message "100% Concluido. Reinicie o dispositivo para concluir as configuracoes"
+}
+
+# Function to update progress
+function Update-Progress {
+    param (
+        [int]$increment = 1
+    )
+    $global:completedTasks += $increment
+    $percentComplete = [math]::Round(($global:completedTasks / $global:totalTasks) * 100)
+    if ($percentComplete -gt 100) {
+        $percentComplete = 100
+    }
+    $progressBar.Value = $percentComplete
+    $progressLabel.Text = "Progresso... $percentComplete% Concluido"
+    $progressBar.Refresh()
+    $progressLabel.Refresh()
 }
 
 # Function to create and align category labels and checkboxes
@@ -86,6 +106,7 @@ function Add-CategoryAndCheckboxes {
         }
         $groupBox.Controls.Add($checkbox)
         $global:checkboxes += $checkbox
+        $global:totalTasks++
         $yPos += 30
 
         # Add tooltip
@@ -121,6 +142,7 @@ function Ensure-ServiceRunning {
     } catch {
         Handle-Error -operation "verificar ou iniciar o servico ${serviceName}" -exception $_
     }
+    Update-Progress
 }
 
 # Function to stop a service if running
@@ -150,6 +172,7 @@ function Stop-ServiceIfRunning {
     } catch {
         Handle-Error -operation "verificar ou parar o servico ${serviceName}" -exception $_
     }
+    Update-Progress
 }
 
 # Function to ensure Winget is installed
@@ -166,6 +189,7 @@ function Ensure-WingetInstalled {
     } catch {
         Handle-Error -operation "verificar ou instalar Winget" -exception $_
     }
+    Update-Progress
 }
 
 # Function to ensure Scoop is installed
@@ -183,6 +207,7 @@ function Ensure-ScoopInstalled {
     } catch {
         Handle-Error -operation "verificar ou instalar Scoop" -exception $_
     }
+    Update-Progress
 }
 
 # Function to ensure WingetUI is installed
@@ -199,6 +224,7 @@ function Ensure-WingetUIInstalled {
     } catch {
         Handle-Error -operation "verificar ou instalar WingetUI" -exception $_
     }
+    Update-Progress
 }
 
 # Function to install or update applications
@@ -209,11 +235,7 @@ function InstallOrUpdate-Application {
     )
     try {
         Log-Message "Verificando instalacao ou atualizacao do aplicativo: ${appId} com ${packageManager}"
-        if ($packageManager -eq "winget") {
-            $installedApp = winget list | Where-Object { $_ -match $appId }
-        } elseif ($packageManager -eq "choco") {
-            $installedApp = choco list --local-only | Where-Object { $_ -match $appId }
-        }
+        $installedApp = &$packageManager list | Where-Object { $_ -match $appId }
         if ($installedApp) {
             Log-Message "Aplicativo ${appId} encontrado. Atualizando..."
             Start-Process $packageManager -ArgumentList "upgrade --id $appId --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
@@ -224,6 +246,7 @@ function InstallOrUpdate-Application {
     } catch {
         Handle-Error -operation "instalar ou atualizar o aplicativo ${appId} com ${packageManager}" -exception $_
     }
+    Update-Progress
 }
 
 # Function to update all applications
@@ -235,7 +258,6 @@ function Update-AllApplications {
         Ensure-ScoopInstalled
         Ensure-WingetUIInstalled
         Start-Process "winget" -ArgumentList "source update" -NoNewWindow -Wait
-        Start-Process "winget" -ArgumentList "upgrade winget" -NoNewWindow -Wait
         Start-Process "winget" -ArgumentList "upgrade --all --silent --accept-package-agreements --accept-source-agreements --force --include-unknown" -NoNewWindow -Wait
         Start-Process "choco" -ArgumentList "upgrade all -y --force" -NoNewWindow -Wait
         Start-Process "scoop" -ArgumentList "update *" -NoNewWindow -Wait
@@ -245,20 +267,30 @@ function Update-AllApplications {
 
     # Update Pip packages
     try {
-        Log-Message "Atualizando pacotes pip..."
-        Start-Process "pip" -ArgumentList "install --upgrade pip" -NoNewWindow -Wait
-        Start-Process "pip" -ArgumentList "list --outdated --format=freeze | %{$_.split('==')[0]} | % {pip install --upgrade $_}" -NoNewWindow -Wait
+        if (Get-Command pip -ErrorAction SilentlyContinue) {
+            Log-Message "Atualizando pacotes pip..."
+            Start-Process "pip" -ArgumentList "install --upgrade pip" -NoNewWindow -Wait
+            Start-Process "pip" -ArgumentList "list --outdated --format=freeze | %{$_.split('==')[0]} | % {pip install --upgrade $_}" -NoNewWindow -Wait
+        } else {
+            Log-Message "pip não está instalado." "WARNING"
+        }
     } catch {
         Handle-Error -operation "atualizar pacotes pip" -exception $_
     }
 
     # Update npm packages
     try {
-        Log-Message "Atualizando pacotes npm..."
-        Start-Process "winget" -ArgumentList "install --id OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements --force" -NoNewWindow -Wait
+        if (Get-Command npm -ErrorAction SilentlyContinue) {
+            Log-Message "Atualizando pacotes npm..."
+            Start-Process "npm" -ArgumentList "install -g npm" -NoNewWindow -Wait
+            Start-Process "npm" -ArgumentList "update -g" -NoNewWindow -Wait
+        } else {
+            Log-Message "npm não está instalado." "WARNING"
+        }
     } catch {
         Handle-Error -operation "atualizar pacotes npm" -exception $_
     }
+    Update-Progress
 }
 
 # Function to update Windows and drivers
@@ -272,7 +304,7 @@ function Update-WindowsAndDrivers {
 
     # Windows Update - including optional updates and fixing common problems
     try {
-        Write-Host "Executando atualizacoes do Windows..."
+        Log-Message "Executando atualizacoes do Windows..."
         # Remover atualizacoes do Microsoft Defender da lista
         $updates = Get-WindowsUpdate -MicrosoftUpdate | Where-Object { $_.Title -notmatch "Microsoft Defender" }
         Install-WindowsUpdate -Update $updates -AcceptAll -AutoReboot
@@ -328,6 +360,7 @@ function Update-WindowsAndDrivers {
             Handle-Error -operation ("executar comando {0}" -f $fix) -exception $_
         }
     }
+    Update-Progress
 }
 
 # Function to perform a complete disk cleanup
@@ -338,6 +371,7 @@ function Complete-DiskCleanup {
     } catch {
         Handle-Error -operation "limpeza completa de disco" -exception $_
     }
+    Update-Progress
 }
 
 # Function to clean temporary files and cache
@@ -359,6 +393,7 @@ function Clean-TemporaryFiles {
         }
     }
     Log-Message "Limpeza de arquivos temporarios e cache concluida."
+    Update-Progress
 }
 
 # Function to activate Hyper-V
@@ -376,6 +411,7 @@ function Activate-HyperV {
     } catch {
         Handle-Error -operation "ativar Hyper-V" -exception $_
     }
+    Update-Progress
 }
 
 # Function to install Windows Sandbox
@@ -387,6 +423,7 @@ function Install-WindowsSandbox {
     } catch {
         Handle-Error -operation "instalar Windows Sandbox" -exception $_
     }
+    Update-Progress
 }
 
 # Function to apply high performance power plan settings
@@ -407,6 +444,7 @@ function Apply-HighPerformanceSettings {
     } catch {
         Handle-Error -operation "aplicar configuracoes de alto desempenho" -exception $_
     }
+    Update-Progress
 }
 
 # Function to perform system maintenance
@@ -431,6 +469,7 @@ function Perform-WindowsMaintenance {
     } else {
         Log-Message "Manutencao do Windows ja realizada recentemente. Pulando etapa."
     }
+    Update-Progress
 }
 
 # Function to optimize Windows for performance
@@ -446,6 +485,7 @@ function Optimize-Windows {
     }
 
     Log-Message "Otimização do Windows concluida."
+    Update-Progress
 }
 
 # Function to install or update Chocolatey
@@ -458,6 +498,7 @@ function Ensure-ChocolateyInstalled {
             [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
             Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
             Log-Message "Chocolatey instalado."
+            refreshenv
         } else {
             Log-Message "Chocolatey ja esta instalado. Atualizando..."
             choco upgrade chocolatey -y --force
@@ -474,6 +515,7 @@ function Ensure-ChocolateyInstalled {
             Handle-Error -operation "verificar ou instalar Chocolatey" -exception $_
         }
     }
+    Update-Progress
 }
 
 # Function to force close processes
@@ -488,67 +530,68 @@ function Force-CloseProcesses {
 function Execute-Tasks {
     Start-Logging
 
-    $completedTasks = 0
-    $totalTasks = ($global:checkboxes | Where-Object { $_.Checked }).Count
-
+    $global:completedTasks = 0
+    $tasks = @()
     foreach ($checkbox in $global:checkboxes) {
         if ($checkbox.Checked) {
-            $progressLabel.Text = "Executando $($checkbox.Text)..."
-            Log-Message "Executando $($checkbox.Text)..."
+            $tasks += $checkbox.Text
+        }
+    }
+    $global:totalTasks = $tasks.Count * $global:tasksPerStep
 
-            try {
-                switch ($checkbox.Text) {
-                    "Microsoft 365" { InstallOrUpdate-Application "Microsoft.Office" }
-                    "Teams Trabalho" { InstallOrUpdate-Application "Microsoft.Teams" }
-                    "Teams Pessoal" { InstallOrUpdate-Application "Microsoft.Teams.Free" }
-                    "PowerShell 7" { InstallOrUpdate-Application "Microsoft.PowerShell" }
-                    "Microsoft Graph" { InstallOrUpdate-Application "Microsoft.Graph" }
-                    "OneDrive" { InstallOrUpdate-Application "Microsoft.OneDrive" }
-                    "DotNet" { InstallOrUpdate-Application "Microsoft.DotNet" }
-                    "VCRedist 2015+" { InstallOrUpdate-Application "Microsoft.VCRedist.2015+.x64" }
-                    "Arc" { InstallOrUpdate-Application "Arc.Browser" }
-                    "Firefox" { InstallOrUpdate-Application "Mozilla.Firefox" }
-                    "Chrome" { InstallOrUpdate-Application "Google.Chrome" }
-                    "Opera GX" { InstallOrUpdate-Application "Opera.GX" }
-                    "Opera One" { InstallOrUpdate-Application "Opera.One" }
-                    "Edge" { InstallOrUpdate-Application "Microsoft.Edge" }
-                    "Vivaldi" { InstallOrUpdate-Application "Vivaldi.Browser" }
-                    "Brave" { InstallOrUpdate-Application "Brave.Browser" }
-                    "7zip" { InstallOrUpdate-Application "7zip.7zip" }
-                    "AnyDesk" { InstallOrUpdate-Application "AnyDesk.SoftwareGmbH" }
-                    "TeamViewer" { InstallOrUpdate-Application "TeamViewer.TeamViewer" }
-                    "Remote Desktop Manager" { InstallOrUpdate-Application "Devolutions.RemoteDesktopManager" }
-                    "FortiClient VPN" { InstallOrUpdate-Application "Fortinet.FortiClientVPN" }
-                    "ScreenShot HD" { InstallOrUpdate-Application "Screenpresso.Screenpresso" }
-                    "Lightshot" { InstallOrUpdate-Application "Skillbrains.Lightshot" }
-                    "Telegram" { InstallOrUpdate-Application "Telegram.TelegramDesktop" }
-                    "Discord" { InstallOrUpdate-Application "Discord.Discord" }
-                    "WhatsApp Web" { InstallOrUpdate-Application "WhatsApp.WhatsAppDesktop" }
-                    "Hyper-V" { Activate-HyperV }
-                    "Windows SandBox" { Install-WindowsSandbox }
-                    "Winget" { Ensure-WingetInstalled }
-                    "Atualizar todas as aplicacoes" { Update-AllApplications }
-                    "Atualizar Windows e Drivers" { Update-WindowsAndDrivers }
-                    "Limpeza completa de disco" { Complete-DiskCleanup }
-                    "Manutencao do Windows" { Perform-WindowsMaintenance }
-                    "Modo Alto Desempenho" { 
-                        Apply-HighPerformanceSettings
-                        Log-Message "As configuracoes de alto desempenho foram aplicadas. Reinicie o computador para concluir a configuracao." 
-                    }
-                    "Otimizar Windows" { Optimize-Windows }
-                    default { Log-Message "Tarefa desconhecida: $($checkbox.Text)" "WARNING" }
+    foreach ($task in $tasks) {
+        $progressLabel.Text = "Executando $task..."
+        Log-Message "Executando $task..."
+        Update-Progress 0
+
+        try {
+            switch ($task) {
+                "Microsoft 365" { InstallOrUpdate-Application "Microsoft.Office" }
+                "Teams Trabalho" { InstallOrUpdate-Application "Microsoft.Teams" }
+                "Teams Pessoal" { InstallOrUpdate-Application "Microsoft.Teams.Free" }
+                "PowerShell 7" { InstallOrUpdate-Application "Microsoft.PowerShell" }
+                "Microsoft Graph" { InstallOrUpdate-Application "Microsoft.Graph" }
+                "OneDrive" { InstallOrUpdate-Application "Microsoft.OneDrive" }
+                "DotNet" { InstallOrUpdate-Application "Microsoft.DotNet" }
+                "VCRedist 2015+" { InstallOrUpdate-Application "Microsoft.VCRedist.2015+.x64" }
+                "Arc" { InstallOrUpdate-Application "Arc.Browser" }
+                "Firefox" { InstallOrUpdate-Application "Mozilla.Firefox" }
+                "Chrome" { InstallOrUpdate-Application "Google.Chrome" }
+                "Opera GX" { InstallOrUpdate-Application "Opera.GX" }
+                "Opera One" { InstallOrUpdate-Application "Opera.One" }
+                "Edge" { InstallOrUpdate-Application "Microsoft.Edge" }
+                "Vivaldi" { InstallOrUpdate-Application "Vivaldi.Browser" }
+                "Brave" { InstallOrUpdate-Application "Brave.Browser" }
+                "7zip" { InstallOrUpdate-Application "7zip.7zip" }
+                "AnyDesk" { InstallOrUpdate-Application "AnyDesk.SoftwareGmbH" }
+                "TeamViewer" { InstallOrUpdate-Application "TeamViewer.TeamViewer" }
+                "Remote Desktop Manager" { InstallOrUpdate-Application "Devolutions.RemoteDesktopManager" }
+                "FortiClient VPN" { InstallOrUpdate-Application "Fortinet.FortiClientVPN" }
+                "ScreenShot HD" { InstallOrUpdate-Application "Screenpresso.Screenpresso" }
+                "Lightshot" { InstallOrUpdate-Application "Skillbrains.Lightshot" }
+                "Telegram" { InstallOrUpdate-Application "Telegram.TelegramDesktop" }
+                "Discord" { InstallOrUpdate-Application "Discord.Discord" }
+                "WhatsApp Web" { InstallOrUpdate-Application "WhatsApp.WhatsAppDesktop" }
+                "Hyper-V" { Activate-HyperV }
+                "Windows SandBox" { Install-WindowsSandbox }
+                "Winget" { Ensure-WingetInstalled }
+                "Atualizar todas as aplicacoes" { Update-AllApplications }
+                "Atualizar Windows e Drivers" { Update-WindowsAndDrivers }
+                "Limpeza completa de disco" { Complete-DiskCleanup }
+                "Manutencao do Windows" { Perform-WindowsMaintenance }
+                "Modo Alto Desempenho" { 
+                    Apply-HighPerformanceSettings
+                    Log-Message "As configuracoes de alto desempenho foram aplicadas. Reinicie o computador para concluir a configuracao." 
                 }
-            } catch {
-                Handle-Error -operation "executar $($checkbox.Text)" -exception $_
+                "Otimizar Windows" { Optimize-Windows }
+                default { Log-Message "Tarefa desconhecida: $task" "WARNING" }
             }
-
-            $completedTasks++
-            $progressBar.Value = [math]::Round(($completedTasks / $totalTasks) * 100)
-            $progressBar.Refresh()
+        } catch {
+            Handle-Error -operation "executar $task" -exception $_
         }
     }
 
-    $progressLabel.Text = "Conclusao..."
+    $progressLabel.Text = "100% Concluido. Reinicie o dispositivo para concluir as configuracoes."
     $progressBar.Value = 100
     $progressBar.Refresh()
     Log-Message "Todas as operacoes foram concluidas com sucesso."
