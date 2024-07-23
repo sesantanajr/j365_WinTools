@@ -1,8 +1,8 @@
-# Add necessary assemblies for Windows Forms and Drawing
+# Import necessary assemblies for Windows Forms and Drawing
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# Initialize global checkbox array
+# Initialize global variables
 $global:checkboxes = @()
 $global:totalTasks = 0
 $global:completedTasks = 0
@@ -192,32 +192,13 @@ function Ensure-WingetInstalled {
     Update-Progress
 }
 
-# Function to ensure Scoop is installed
-function Ensure-ScoopInstalled {
-    try {
-        Log-Message "Verificando se Scoop esta instalado..."
-        if (-not (Get-Command scoop -ErrorAction SilentlyContinue)) {
-            Log-Message "Scoop nao encontrado, instalando..."
-            Set-ExecutionPolicy RemoteSigned -Scope CurrentUser -Force
-            Invoke-Expression (New-Object System.Net.WebClient).DownloadString('https://get.scoop.sh')
-            Log-Message "Scoop instalado."
-        } else {
-            Log-Message "Scoop ja esta instalado."
-        }
-    } catch {
-        Handle-Error -operation "verificar ou instalar Scoop" -exception $_
-    }
-    Update-Progress
-}
-
 # Function to ensure WingetUI is installed
 function Ensure-WingetUIInstalled {
     try {
         Log-Message "Verificando se WingetUI esta instalado..."
         if (-not (Get-Command wingetui -ErrorAction SilentlyContinue)) {
             Log-Message "WingetUI nao encontrado, instalando..."
-            Invoke-WebRequest -Uri "https://github.com/marticliment/WingetUI/releases/latest/download/WingetUI.exe" -OutFile "$env:temp\WingetUI.exe"
-            Start-Process -FilePath "$env:temp\WingetUI.exe" -ArgumentList "/install" -NoNewWindow -Wait
+            winget install SomePythonThings.WingetUIStore
         } else {
             Log-Message "WingetUI ja esta instalado."
         }
@@ -254,13 +235,9 @@ function Update-AllApplications {
     try {
         Log-Message "Atualizando todas as aplicacoes..."
         Ensure-WingetInstalled
-        Ensure-ChocolateyInstalled
-        Ensure-ScoopInstalled
         Ensure-WingetUIInstalled
         Start-Process "winget" -ArgumentList "source update" -NoNewWindow -Wait
         Start-Process "winget" -ArgumentList "upgrade --all --silent --accept-package-agreements --accept-source-agreements --force --include-unknown" -NoNewWindow -Wait
-        Start-Process "choco" -ArgumentList "upgrade all -y --force" -NoNewWindow -Wait
-        Start-Process "scoop" -ArgumentList "update *" -NoNewWindow -Wait
     } catch {
         Handle-Error -operation "atualizar todas as aplicacoes" -exception $_
     }
@@ -488,36 +465,6 @@ function Optimize-Windows {
     Update-Progress
 }
 
-# Function to install or update Chocolatey
-function Ensure-ChocolateyInstalled {
-    try {
-        Log-Message "Verificando se Chocolatey esta instalado..."
-        if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
-            Log-Message "Chocolatey nao encontrado, instalando..."
-            Set-ExecutionPolicy Bypass -Scope Process -Force
-            [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
-            Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))
-            Log-Message "Chocolatey instalado."
-            refreshenv
-        } else {
-            Log-Message "Chocolatey ja esta instalado. Atualizando..."
-            choco upgrade chocolatey -y --force
-        }
-    } catch {
-        if ($_.Exception.Message -match "An existing Chocolatey installation was detected") {
-            Log-Message "Instalacao existente do Chocolatey detectada. Atualizando em vez de instalar." "WARNING"
-            try {
-                choco upgrade chocolatey -y --force
-            } catch {
-                Handle-Error -operation "atualizar Chocolatey" -exception $_
-            }
-        } else {
-            Handle-Error -operation "verificar ou instalar Chocolatey" -exception $_
-        }
-    }
-    Update-Progress
-}
-
 # Function to force close processes
 function Force-CloseProcesses {
     param (
@@ -546,7 +493,7 @@ function Execute-Tasks {
 
         try {
             switch ($task) {
-                "Microsoft 365" { InstallOrUpdate-Application "Microsoft.Office" }
+                "Microsoft 365 Apps" { InstallOrUpdate-Application "Microsoft.Office" }
                 "Teams Trabalho" { InstallOrUpdate-Application "Microsoft.Teams" }
                 "Teams Pessoal" { InstallOrUpdate-Application "Microsoft.Teams.Free" }
                 "PowerShell 7" { InstallOrUpdate-Application "Microsoft.PowerShell" }
@@ -554,14 +501,14 @@ function Execute-Tasks {
                 "OneDrive" { InstallOrUpdate-Application "Microsoft.OneDrive" }
                 "DotNet" { InstallOrUpdate-Application "Microsoft.DotNet" }
                 "VCRedist 2015+" { InstallOrUpdate-Application "Microsoft.VCRedist.2015+.x64" }
-                "Arc" { InstallOrUpdate-Application "Arc.Browser" }
+                "Arc" { InstallOrUpdate-Application "TheBrowserCompany.Arc" }
                 "Firefox" { InstallOrUpdate-Application "Mozilla.Firefox" }
                 "Chrome" { InstallOrUpdate-Application "Google.Chrome" }
-                "Opera GX" { InstallOrUpdate-Application "Opera.GX" }
-                "Opera One" { InstallOrUpdate-Application "Opera.One" }
+                "Opera GX" { InstallOrUpdate-Application "Opera.OperaGX" }
+                "Opera One" { InstallOrUpdate-Application "Opera.Opera" }
                 "Edge" { InstallOrUpdate-Application "Microsoft.Edge" }
-                "Vivaldi" { InstallOrUpdate-Application "Vivaldi.Browser" }
-                "Brave" { InstallOrUpdate-Application "Brave.Browser" }
+                "Vivaldi" { InstallOrUpdate-Application "VivaldiTechnologies.Vivaldi" }
+                "Brave" { InstallOrUpdate-Application "Brave.Brave" }
                 "7zip" { InstallOrUpdate-Application "7zip.7zip" }
                 "AnyDesk" { InstallOrUpdate-Application "AnyDesk.SoftwareGmbH" }
                 "TeamViewer" { InstallOrUpdate-Application "TeamViewer.TeamViewer" }
@@ -600,7 +547,7 @@ function Execute-Tasks {
 
 # Create categories and add checkboxes
 $categories = @{
-    "Microsoft" = @("Microsoft 365", "Teams Trabalho", "Teams Pessoal", "PowerShell 7", "Microsoft Graph", "OneDrive", "DotNet", "VCRedist 2015+")
+    "Microsoft" = @("Microsoft 365 Apps", "Teams Trabalho", "Teams Pessoal", "PowerShell 7", "Microsoft Graph", "OneDrive", "DotNet", "VCRedist 2015+")
     "Navegadores" = @("Arc", "Firefox", "Chrome", "Opera GX", "Opera One", "Edge", "Vivaldi", "Brave")
     "Utilitarios" = @("7zip", "AnyDesk", "TeamViewer", "Remote Desktop Manager", "FortiClient VPN", "ScreenShot HD", "Lightshot", "Telegram", "Discord", "WhatsApp Web")
     "Sistema" = @("Hyper-V", "Windows SandBox", "Winget", "Atualizar todas as aplicacoes", "Atualizar Windows e Drivers", "Limpeza completa de disco", "Manutencao do Windows", "Modo Alto Desempenho", "Otimizar Windows")
