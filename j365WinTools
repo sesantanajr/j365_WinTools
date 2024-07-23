@@ -1,7 +1,3 @@
-# C:\Scripts\Jornada365_WindowsTools.ps1
-# Purpose: Post-installation script for Windows with GUI for selecting and executing installations and updates
-# Title: Jornada 365 - Windows Tools
-
 # Add necessary assemblies for Windows Forms and Drawing
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -26,7 +22,7 @@ function New-UIElement {
     return $element
 }
 
-# Function to log messages
+# Function to log messages with different levels
 function Log-Message {
     param (
         [string]$message,
@@ -63,83 +59,6 @@ function Stop-Logging {
     Log-Message "Fim da execucao do script"
 }
 
-# Create the main form
-$form = New-UIElement -type "Form" -properties @{
-    Text = "Jornada 365 - Windows Tools"
-    Size = New-Object System.Drawing.Size(950, 750)
-    StartPosition = "CenterScreen"
-    BackColor = [System.Drawing.Color]::White
-    FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
-    MaximizeBox = $false
-    MinimizeBox = $true
-    ShowInTaskbar = $true
-    AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::None
-    TopMost = $false
-}
-
-# Allow the form to be draggable
-$form.Add_MouseDown({
-    if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
-        $form.Capture = $true
-        $form.Tag = [System.Drawing.Point]::Subtract($form.PointToScreen([System.Windows.Forms.Control]::MousePosition), [System.Drawing.Size]$form.Location)
-    }
-})
-
-$form.Add_MouseMove({
-    if ($form.Capture -and $_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
-        $form.Location = [System.Drawing.Point]::Subtract($form.PointToScreen([System.Windows.Forms.Control]::MousePosition), [System.Drawing.Size]$form.Tag)
-    }
-})
-
-$form.Add_MouseUp({
-    $form.Capture = $false
-})
-
-# Add logo
-$logo = New-UIElement -type "PictureBox" -properties @{
-    ImageLocation = "https://jornada365.cloud/wp-content/uploads/2024/03/Logotipo-Jornada-365-Home.png"
-    SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
-    Size = New-Object System.Drawing.Size(180, 60)
-    Location = New-Object System.Drawing.Point(20, 10)
-}
-$form.Controls.Add($logo)
-
-# Add title label
-$titleLabel = New-UIElement -type "Label" -properties @{
-    Text = "Jornada 365 - Windows Tools"
-    Font = New-Object System.Drawing.Font("Segoe UI", 22, [System.Drawing.FontStyle]::Bold)
-    Size = New-Object System.Drawing.Size(600, 40)
-    Location = New-Object System.Drawing.Point(220, 10)
-    TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-}
-$form.Controls.Add($titleLabel)
-
-# Add subtitle label
-$subtitleLabel = New-UIElement -type "Label" -properties @{
-    Text = "Sua jornada comeca aqui  |  jornada365.cloud"
-    Font = New-Object System.Drawing.Font("Segoe UI", 12)
-    Size = New-Object System.Drawing.Size(600, 25)
-    Location = New-Object System.Drawing.Point(220, 50)
-    TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
-}
-$form.Controls.Add($subtitleLabel)
-
-# Panel to hold checkboxes
-$panel = New-UIElement -type "Panel" -properties @{
-    Location = New-Object System.Drawing.Point(10, 90)
-    Size = New-Object System.Drawing.Size(920, 480)
-    BackColor = [System.Drawing.Color]::White
-}
-$form.Controls.Add($panel)
-
-# Categories and checkboxes
-$categories = @{
-    "Microsoft" = @("Microsoft 365", "Microsoft Teams Trabalho", "Microsoft Teams Pessoal", "PowerShell 7", "Microsoft Graph", "OneDrive", "DotNet", "Microsoft.VCRedist.2015+.x64")
-    "Navegadores" = @("Arc", "Firefox", "Chrome", "Opera GX", "Opera One", "Edge", "Vivaldi", "Brave")
-    "Utilitarios" = @("7zip", "AnyDesk", "TeamViewer", "Remote Desktop Manager", "FortiClient VPN", "ScreenShot HD", "Lightshot", "Telegram", "Discord", "WhatsApp Web")
-    "Sistema" = @("Hyper-V", "Windows SandBox", "Winget", "Atualizar todas as aplicacoes", "Atualizar Windows e Drivers", "Limpeza completa de disco", "Manutencao do Windows", "Modo Alto Desempenho", "Otimizar Windows")
-}
-
 # Function to create and align category labels and checkboxes
 function Add-CategoryAndCheckboxes {
     param (
@@ -150,9 +69,9 @@ function Add-CategoryAndCheckboxes {
     )
     $groupBox = New-UIElement -type "GroupBox" -properties @{
         Text = $category
-        Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+        Font = New-Object System.Drawing.Font("Verdana", 12, [System.Drawing.FontStyle]::Bold)
         Location = New-Object System.Drawing.Point($xPos, $yPos)
-        Size = New-Object System.Drawing.Size(220, 450)
+        Size = New-Object System.Drawing.Size(220, 360)
     }
     $panel.Controls.Add($groupBox)
 
@@ -162,7 +81,7 @@ function Add-CategoryAndCheckboxes {
             Text = $item
             Location = New-Object System.Drawing.Point(10, $yPos)
             AutoSize = $true
-            Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
+            Font = New-Object System.Drawing.Font("Verdana", 10, [System.Drawing.FontStyle]::Regular)
             BackColor = [System.Drawing.Color]::White
         }
         $groupBox.Controls.Add($checkbox)
@@ -175,124 +94,11 @@ function Add-CategoryAndCheckboxes {
     }
 }
 
-# Initialize positions
-$initialXPos = 10
-$initialYPos = 10
-$columnWidth = 230
-
-# Add categories and checkboxes to the panel
-$xPos = $initialXPos
-foreach ($category in $categories.Keys) {
-    Add-CategoryAndCheckboxes -category $category -items $categories[$category] -xPos $xPos -yPos $initialYPos
-    $xPos += $columnWidth
-    if ($xPos + $columnWidth > $panel.Width) {
-        $xPos = $initialXPos
-        $initialYPos += 470
-    }
-}
-
-# Progress bar and label
-$progressLabel = New-UIElement -type "Label" -properties @{
-    Text = "Progresso..."
-    Font = New-Object System.Drawing.Font("Segoe UI", 10)
-    Location = New-Object System.Drawing.Point(10, 580)
-}
-$form.Controls.Add($progressLabel)
-
-$progressBar = New-UIElement -type "ProgressBar" -properties @{
-    Size = New-Object System.Drawing.Size(920, 10)
-    Location = New-Object System.Drawing.Point(10, 610)
-    Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
-    ForeColor = [System.Drawing.Color]::DodgerBlue
-}
-$form.Controls.Add($progressBar)
-
-# Buttons panel
-$buttonPanel = New-UIElement -type "Panel" -properties @{
-    Location = New-Object System.Drawing.Point(10, 640)
-    Size = New-Object System.Drawing.Size(920, 60)
-    BackColor = [System.Drawing.Color]::White
-}
-$form.Controls.Add($buttonPanel)
-
-# Add buttons
-$executeAllButton = New-UIElement -type "Button" -properties @{
-    Text = "Executar Todos"
-    Size = New-Object System.Drawing.Size(200, 40)
-    Location = New-Object System.Drawing.Point(20, 10)
-    Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
-    FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    BackColor = [System.Drawing.Color]::Black
-    ForeColor = [System.Drawing.Color]::White
-    TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-    Cursor = [System.Windows.Forms.Cursors]::Hand
-} -onClick {
-    foreach ($checkbox in $global:checkboxes) {
-        $checkbox.Checked = $true
-    }
-    Execute-Tasks
-}
-$buttonPanel.Controls.Add($executeAllButton)
-
-$executeSelectedButton = New-UIElement -type "Button" -properties @{
-    Text = "Executar Selecionados"
-    Size = New-Object System.Drawing.Size(200, 40)
-    Location = New-Object System.Drawing.Point(240, 10)
-    Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
-    FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    BackColor = [System.Drawing.Color]::Black
-    ForeColor = [System.Drawing.Color]::White
-    TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-    Cursor = [System.Windows.Forms.Cursors]::Hand
-} -onClick {
-    Execute-Tasks
-}
-$buttonPanel.Controls.Add($executeSelectedButton)
-
-$selectAllButton = New-UIElement -type "Button" -properties @{
-    Text = "Selecionar Todos"
-    Size = New-Object System.Drawing.Size(200, 40)
-    Location = New-Object System.Drawing.Point(460, 10)
-    Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
-    FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    BackColor = [System.Drawing.Color]::Black
-    ForeColor = [System.Drawing.Color]::White
-    TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-    Cursor = [System.Windows.Forms.Cursors]::Hand
-} -onClick {
-    if ($selectAllButton.Text -eq "Selecionar Todos") {
-        foreach ($checkbox in $global:checkboxes) {
-            $checkbox.Checked = $true
-        }
-        $selectAllButton.Text = "Desmarcar Todos"
-    } else {
-        foreach ($checkbox in $global:checkboxes) {
-            $checkbox.Checked = $false
-        }
-        $selectAllButton.Text = "Selecionar Todos"
-    }
-}
-$buttonPanel.Controls.Add($selectAllButton)
-
-$closeButton = New-UIElement -type "Button" -properties @{
-    Text = "Encerrar"
-    Size = New-Object System.Drawing.Size(200, 40)
-    Location = New-Object System.Drawing.Point(680, 10)
-    Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Regular)
-    FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
-    BackColor = [System.Drawing.Color]::Black
-    ForeColor = [System.Drawing.Color]::White
-    TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
-    Cursor = [System.Windows.Forms.Cursors]::Hand
-} -onClick {
-    $form.Close()
-}
-$buttonPanel.Controls.Add($closeButton)
-
 # Function to ensure a service is running
 function Ensure-ServiceRunning {
     param (
-        [string]$serviceName
+        [string]$serviceName,
+        [int]$timeout = 60
     )
     try {
         Log-Message "Verificando status do serviço: ${serviceName}"
@@ -300,6 +106,14 @@ function Ensure-ServiceRunning {
         if ($service.Status -ne 'Running') {
             Log-Message "Iniciando serviço: ${serviceName}"
             Start-Service -Name $serviceName
+            $elapsedTime = 0
+            while ((Get-Service -Name $serviceName).Status -ne 'Running' -and $elapsedTime -lt $timeout) {
+                Start-Sleep -Seconds 1
+                $elapsedTime++
+            }
+            if ((Get-Service -Name $serviceName).Status -ne 'Running') {
+                throw "Timeout ao iniciar o serviço ${serviceName}"
+            }
             Log-Message "${serviceName} iniciado."
         } else {
             Log-Message "${serviceName} já está em execução."
@@ -312,7 +126,8 @@ function Ensure-ServiceRunning {
 # Function to stop a service if running
 function Stop-ServiceIfRunning {
     param (
-        [string]$serviceName
+        [string]$serviceName,
+        [int]$timeout = 60
     )
     try {
         Log-Message "Verificando status do serviço: ${serviceName}"
@@ -320,6 +135,14 @@ function Stop-ServiceIfRunning {
         if ($service.Status -eq 'Running') {
             Log-Message "Parando serviço: ${serviceName}"
             Stop-Service -Name $serviceName -Force
+            $elapsedTime = 0
+            while ((Get-Service -Name $serviceName).Status -eq 'Running' -and $elapsedTime -lt $timeout) {
+                Start-Sleep -Seconds 1
+                $elapsedTime++
+            }
+            if ((Get-Service -Name $serviceName).Status -eq 'Running') {
+                throw "Timeout ao parar o serviço ${serviceName}"
+            }
             Log-Message "${serviceName} parado."
         } else {
             Log-Message "${serviceName} já está parado."
@@ -362,6 +185,22 @@ function Ensure-ScoopInstalled {
     }
 }
 
+# Function to ensure WingetUI is installed
+function Ensure-WingetUIInstalled {
+    try {
+        Log-Message "Verificando se WingetUI está instalado..."
+        if (-not (Get-Command wingetui -ErrorAction SilentlyContinue)) {
+            Log-Message "WingetUI não encontrado, instalando..."
+            Invoke-WebRequest -Uri "https://github.com/marticliment/WingetUI/releases/latest/download/WingetUI.exe" -OutFile "$env:temp\WingetUI.exe"
+            Start-Process -FilePath "$env:temp\WingetUI.exe" -ArgumentList "/install" -NoNewWindow -Wait
+        } else {
+            Log-Message "WingetUI já está instalado."
+        }
+    } catch {
+        Handle-Error -operation "verificar ou instalar WingetUI" -exception $_
+    }
+}
+
 # Function to install or update applications
 function InstallOrUpdate-Application {
     param (
@@ -394,6 +233,7 @@ function Update-AllApplications {
         Ensure-WingetInstalled
         Ensure-ChocolateyInstalled
         Ensure-ScoopInstalled
+        Ensure-WingetUIInstalled
         Start-Process "winget" -ArgumentList "source update" -NoNewWindow -Wait
         Start-Process "winget" -ArgumentList "upgrade winget" -NoNewWindow -Wait
         Start-Process "winget" -ArgumentList "upgrade --all --silent --accept-package-agreements --accept-source-agreements --force --include-unknown" -NoNewWindow -Wait
@@ -640,9 +480,6 @@ function Force-CloseProcesses {
 function Execute-Tasks {
     Start-Logging
 
-    $progressLabel.Text = "Iniciando..."
-    $progressBar.Value = 0
-
     $completedTasks = 0
     $totalTasks = ($global:checkboxes | Where-Object { $_.Checked }).Count
 
@@ -654,13 +491,13 @@ function Execute-Tasks {
             try {
                 switch ($checkbox.Text) {
                     "Microsoft 365" { InstallOrUpdate-Application "Microsoft.Office" }
-                    "Microsoft Teams Trabalho" { InstallOrUpdate-Application "Microsoft.Teams" }
-                    "Microsoft Teams Pessoal" { InstallOrUpdate-Application "Microsoft.Teams.Free" }
+                    "Teams Trabalho" { InstallOrUpdate-Application "Microsoft.Teams" }
+                    "Teams Pessoal" { InstallOrUpdate-Application "Microsoft.Teams.Free" }
                     "PowerShell 7" { InstallOrUpdate-Application "Microsoft.PowerShell" }
                     "Microsoft Graph" { InstallOrUpdate-Application "Microsoft.Graph" }
                     "OneDrive" { InstallOrUpdate-Application "Microsoft.OneDrive" }
                     "DotNet" { InstallOrUpdate-Application "Microsoft.DotNet" }
-                    "Microsoft.VCRedist.2015+.x64" { InstallOrUpdate-Application "Microsoft.VCRedist.2015+.x64" }
+                    "VCRedist 2015+" { InstallOrUpdate-Application "Microsoft.VCRedist.2015+.x64" }
                     "Arc" { InstallOrUpdate-Application "Arc.Browser" }
                     "Firefox" { InstallOrUpdate-Application "Mozilla.Firefox" }
                     "Chrome" { InstallOrUpdate-Application "Google.Chrome" }
@@ -706,6 +543,207 @@ function Execute-Tasks {
     Log-Message "Todas as operações foram concluídas com sucesso."
     Log-Message "As configurações de alto desempenho foram aplicadas. Reinicie o computador para concluir a configuração."
     Stop-Logging
+}
+
+# Create the main form
+$form = New-UIElement -type "Form" -properties @{
+    Text = "Jornada 365 - Windows Tools"
+    Size = New-Object System.Drawing.Size(960, 720)
+    StartPosition = "CenterScreen"
+    BackColor = [System.Drawing.Color]::White
+    FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedSingle
+    MaximizeBox = $false
+    MinimizeBox = $true
+    ShowInTaskbar = $true
+    AutoScaleMode = [System.Windows.Forms.AutoScaleMode]::Font
+    TopMost = $false
+}
+
+# Allow the form to be draggable
+$form.Add_MouseDown({
+    if ($_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+        $form.Capture = $true
+        $form.Tag = [System.Drawing.Point]::Subtract($form.PointToScreen([System.Windows.Forms.Control]::MousePosition), [System.Drawing.Size]$form.Location)
+    }
+})
+
+$form.Add_MouseMove({
+    if ($form.Capture -and $_.Button -eq [System.Windows.Forms.MouseButtons]::Left) {
+        $form.Location = [System.Drawing.Point]::Subtract($form.PointToScreen([System.Windows.Forms.Control]::MousePosition), [System.Drawing.Size]$form.Tag)
+    }
+})
+
+$form.Add_MouseUp({
+    $form.Capture = $false
+})
+
+# Add logo
+$logo = New-UIElement -type "PictureBox" -properties @{
+    ImageLocation = "https://jornada365.cloud/wp-content/uploads/2024/03/Logotipo-Jornada-365-Home.png"
+    SizeMode = [System.Windows.Forms.PictureBoxSizeMode]::Zoom
+    Size = New-Object System.Drawing.Size(180, 60)
+    Location = New-Object System.Drawing.Point(20, 10)
+}
+$form.Controls.Add($logo)
+
+# Add title label
+$titleLabel = New-UIElement -type "Label" -properties @{
+    Text = "Jornada 365 - Windows Tools"
+    Font = New-Object System.Drawing.Font("Verdana", 22, [System.Drawing.FontStyle]::Bold)
+    Size = New-Object System.Drawing.Size(600, 40)
+    Location = New-Object System.Drawing.Point(240, 10)  # Adjusted to the right
+    TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+}
+$form.Controls.Add($titleLabel)
+
+# Add subtitle label
+$subtitleLabel = New-UIElement -type "Label" -properties @{
+    Text = "Sua jornada comeca aqui  |  jornada365.cloud"
+    Font = New-Object System.Drawing.Font("Verdana", 12)
+    Size = New-Object System.Drawing.Size(600, 25)
+    Location = New-Object System.Drawing.Point(240, 50)  # Adjusted to the right
+    TextAlign = [System.Drawing.ContentAlignment]::MiddleLeft
+}
+$form.Controls.Add($subtitleLabel)
+
+# Panel to hold checkboxes
+$panel = New-UIElement -type "Panel" -properties @{
+    Location = New-Object System.Drawing.Point(10, 90)
+    Size = New-Object System.Drawing.Size(940, 400)
+    BackColor = [System.Drawing.Color]::White
+}
+$form.Controls.Add($panel)
+
+# Initialize positions
+$initialXPos = 10
+$initialYPos = 10
+$columnWidth = 230
+
+# Add categories and checkboxes to the panel
+$xPos = $initialXPos
+foreach ($category in $categories.Keys) {
+    Add-CategoryAndCheckboxes -category $category -items $categories[$category] -xPos $xPos -yPos $initialYPos
+    $xPos += $columnWidth
+    if ($xPos + $columnWidth > $panel.Width) {
+        $xPos = $initialXPos
+        $initialYPos += 380
+    }
+}
+
+# Progress bar and label
+$progressLabel = New-UIElement -type "Label" -properties @{
+    Text = "Progresso..."
+    Font = New-Object System.Drawing.Font("Verdana", 10)
+    Size = New-Object System.Drawing.Size(940, 20)
+    Location = New-Object System.Drawing.Point(10, 490)
+    TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+}
+$form.Controls.Add($progressLabel)
+
+$progressBar = New-UIElement -type "ProgressBar" -properties @{
+    Size = New-Object System.Drawing.Size(600, 15)
+    Location = New-Object System.Drawing.Point(180, 510)
+    Style = [System.Windows.Forms.ProgressBarStyle]::Continuous
+    ForeColor = [System.Drawing.Color]::DodgerBlue
+    BackColor = [System.Drawing.Color]::LightGray
+    MarqueeAnimationSpeed = 20
+}
+$form.Controls.Add($progressBar)
+
+# Buttons panel
+$buttonPanel = New-UIElement -type "Panel" -properties @{
+    Location = New-Object System.Drawing.Point(10, 540)
+    Size = New-Object System.Drawing.Size(940, 60)
+    BackColor = [System.Drawing.Color]::White
+}
+$form.Controls.Add($buttonPanel)
+
+# Function to create standard buttons
+function Create-Button {
+    param (
+        [string]$text,
+        [int]$xPos,
+        [scriptblock]$onClick
+    )
+    $button = New-UIElement -type "Button" -properties @{
+        Text = $text
+        Size = New-Object System.Drawing.Size(200, 40)
+        Location = New-Object System.Drawing.Point($xPos, 10)
+        Font = New-Object System.Drawing.Font("Verdana", 10, [System.Drawing.FontStyle]::Regular)
+        FlatStyle = [System.Windows.Forms.FlatStyle]::Flat
+        BackColor = [System.Drawing.Color]::Black
+        ForeColor = [System.Drawing.Color]::White
+        TextAlign = [System.Drawing.ContentAlignment]::MiddleCenter
+        Cursor = [System.Windows.Forms.Cursors]::Hand
+    }
+
+    $button.FlatAppearance.BorderSize = 0
+    $button.Add_Click($onClick)
+    return $button
+}
+
+# Add buttons and centralize them
+$buttons = @()
+$buttons += Create-Button -text "Executar Todos" -xPos 10 -onClick {
+    foreach ($checkbox in $global:checkboxes) {
+        $checkbox.Checked = $true
+    }
+    Execute-Tasks
+}
+$buttons += Create-Button -text "Executar Selecionados" -xPos 220 -onClick {
+    Execute-Tasks
+}
+$selectAllButton = Create-Button -text "Selecionar Todos" -xPos 430 -onClick {
+    if ($selectAllButton.Text -eq "Selecionar Todos") {
+        foreach ($checkbox in $global:checkboxes) {
+            $checkbox.Checked = $true
+        }
+        $selectAllButton.Text = "Desmarcar Todos"
+    } else {
+        foreach ($checkbox in $global:checkboxes) {
+            $checkbox.Checked = $false
+        }
+        $selectAllButton.Text = "Selecionar Todos"
+    }
+}
+$buttons += $selectAllButton
+$buttons += Create-Button -text "Encerrar" -xPos 640 -onClick {
+    $form.Close()
+}
+
+# Calculate the center position for buttons
+$buttonPanelWidth = $buttonPanel.Width
+$totalButtonWidth = ($buttons | Measure-Object -Property Width -Sum).Sum + (($buttons.Count - 1) * 20)
+$startXPos = [math]::Round(($buttonPanelWidth - $totalButtonWidth) / 2)
+
+# Set button positions dynamically
+$xPos = $startXPos
+foreach ($button in $buttons) {
+    $button.Location = New-Object System.Drawing.Point($xPos, 10)
+    $buttonPanel.Controls.Add($button)
+    $xPos += $button.Width + 20
+}
+
+# Create categories and add checkboxes
+$categories = @{
+    "Microsoft" = @("M365", "Teams Trabalho", "Teams Pessoal", "PowerShell 7", "Microsoft Graph", "OneDrive", "DotNet", "VCRedist 2015+")
+    "Navegadores" = @("Arc", "Firefox", "Chrome", "Opera GX", "Opera One", "Edge", "Vivaldi", "Brave")
+    "Utilitarios" = @("7zip", "AnyDesk", "TeamViewer", "Remote Desktop Manager", "FortiClient VPN", "ScreenShot HD", "Lightshot", "Telegram", "Discord", "WhatsApp Web")
+    "Sistema" = @("Hyper-V", "Windows SandBox", "Winget", "Atualizar todas as aplicacoes", "Atualizar Windows e Drivers", "Limpeza completa de disco", "Manutencao do Windows", "Modo Alto Desempenho", "Otimizar Windows")
+}
+
+$initialXPos = 10
+$initialYPos = 10
+$columnWidth = 230
+
+$xPos = $initialXPos
+foreach ($category in $categories.Keys) {
+    Add-CategoryAndCheckboxes -category $category -items $categories[$category] -xPos $xPos -yPos $initialYPos
+    $xPos += $columnWidth
+    if ($xPos + $columnWidth > $panel.Width) {
+        $xPos = $initialXPos
+        $initialYPos += 380
+    }
 }
 
 # Run the form
