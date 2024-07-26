@@ -50,14 +50,14 @@ O script "Jornada 365 - Windows Tools" oferece as seguintes funcionalidades prin
 
 1. **Clone o Repositório**:
    ```sh
-   git clone https://github.com/seu-usuario/jornada365-windows-tools.git
-   cd jornada365-windows-tools
+   git clone https://github.com/seu-usuario/j365_WinTools.git
+   cd j365_WinTools
    ```
 
 2. **Execute o Script**:
    Abra o PowerShell como administrador e execute o script:
    ```sh
-   .\Jornada365-WindowsTools.ps1
+   .\j365_WinTools.ps1
    ```
 
 ### Estrutura do Script
